@@ -7,10 +7,12 @@ Pocket): the same 68000 / Z80 / K056832 / K055673 / K055555 / K054338 / K054539 
 
 **Status.** The first build, `violentstorm_20261012`, was tested on a real MiSTer by the repository owner: the game works in
 all areas. It has one known fault, a frozen picture with Scandoubler Fx or `forced_scandoubler` (see below), fixed in
-`releases/violentstorm_20261013.rbf` (Quartus 17.0.2: 46 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every clock's slack positive:
-+0.74 ns on the 96 MHz core clock, +0.23 ns the tightest hold). That build has been checked in simulation only (against
-MAME 0.289, the benches under `sim/`) and is not yet tested on a board. Everything in the verification table below was
-checked in simulation.
+`violentstorm_20261013` (tested on the board by the repository owner: it works, the scandoubler modes included). The
+current build, tested the same way, is `releases/violentstorm_20261014.rbf` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every
+clock's slack positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold), which adds **fast loading** (about a
+second with a recent Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; the owner reports that the
+build and both features work on a MiSTer. One person's test on one board, not a comparison with the arcade PCB. Everything
+in the verification table below was checked in simulation against MAME 0.289 (the benches under `sim/`).
 
 ## What is verified (against MAME 0.289, `viostorm`)
 
@@ -29,7 +31,18 @@ checked in simulation.
 2. Put your MAME 0.289 `viostorm.zip` in `/media/fat/games/mame/` (the merged set holds all versions, or the clone zips
    `viostormu.zip`, `viostormj.zip` ... next to it). No ROMs are distributed.
 3. Start `Violent Storm (World ver EAC)` (or the USA / Japan / Asia version) from the Arcade menu. The ROM image is 18 MB.
-   The game's power-on RAM / ROM check takes about 14 seconds, as on the board.
+   With a recent Main_MiSTer (one that knows the MRA's `address=` attribute) it is copied to the DDR3 in one go and loaded
+   in about a second; an older one streams it through the HPS port, as before, which takes far longer. Use the MRAs from
+   the zip or `mra/`: the attribute is in them. The game's power-on RAM / ROM check takes about 14 seconds, as on the board.
+
+### Fast loading
+
+The seven MRAs carry `address="0x32000000"` on the ROM image. A Main_MiSTer that supports that attribute copies the assembled
+18 MB image into the DDR3 in one go instead of streaming it through the HPS port a byte at a time, and the core reads it back
+from there into its loader: the load takes about a second. There is nothing to set. A Main_MiSTer that ignores the attribute
+streams the image as before, with the same RBF and MRAs. To see which of the two you got, switch on the Diagnostic overlay
+(see below): the *download* square is lit for about a second with fast loading and for the whole, much longer streamed load
+without. How it works: `docs/mister-memory.md`, "Fast load".
 
 | Set | MRA |
 |---|---|
@@ -48,6 +61,7 @@ The two bootlegs in MAME (`viostormubbl`, `viostormabbl`) are not supported.
 | Option | Values | |
 |---|---|---|
 | Aspect ratio | Original, Full Screen, [ARC1], [ARC2] | Original is 4:3 |
+| Scale | Normal, V-Integer, HV-Integer, Narrower HV-Integer, HV-Integer+ | Integer scaling for the HDMI scaler (the framework's `video_freak`; the 15 kHz analog output is not touched). Normal leaves the picture's size to the scaler. The modes work from the finished picture (the scandoubler and CRT Adjust included) and the scaler's own output size; Full Screen has no proportions for the integer rule to size the width from, so with an integer Scale it is given the screen's own |
 | Flip Screen | Off, On | The picture turned 180 degrees on every output (a frame buffer in the DDR3: one frame of delay while on) |
 | Scandoubler Fx | None, HQ2x, CRT 25%, CRT 50%, CRT 75% | |
 | CRT Adjust | submenu: Off, On; H-Size 0..+2 / -16..-1, H-Position -48..+20, V-Shift -16..+15 | Fits the picture to a 15 kHz analog output. Does nothing while the scandoubler is in use |

@@ -42,6 +42,22 @@ classifies each word by image offset, computes its address (a region base) and w
 The caches are swept on every download start. The default EEPROM is a separate download (MRA index 2), and the same index
 is used to save and restore it (`<nvram>`).
 
+### Fast load (the MRA's `address=` attribute)
+
+With `address="0x32000000"` on the index-0 `<rom>`, a recent Main_MiSTer copies the whole assembled image into the DDR3 at that
+byte address in one `memcpy`, bracketed by a download that has no data bytes: it starts with `ioctl_addr` = the image's length
+(an ordinary download starts at 0, which is how `ViolentStorm.sv` tells them apart: `fast_dl`) and ends with it. The core
+stays in reset from the start until `vs_mem` has pushed the whole image through the loader (`fl_done`). `vs_mem` reads the image
+back in 256-byte blocks (a 32-beat burst through the arbiter's client port, `ddr_arb.sv` `c_*`, into a 32 x 64-bit buffer),
+swaps each little-endian halfword to the image's big-endian word and pushes it into the loader's FIFO, as long as the FIFO has
+room; the dispatcher behind it is unchanged, so the layout is the one above. The memory test (`mem_test.sv`) sums the bytes of the
+image as they stream in, so the replay hands it the same bytes (high, then low, one word every three clocks) and its sums are
+those of the image. Nothing else of the DDR3 is touched: the window's offset 0x400000 beats (byte 0x32000000, `FL_BASE`) is clear
+of the Flip Screen buffers (0x80000 beats). The loader accepts about a word per ten clocks, so the 9.57 million words take about
+a second; that, not the DDR3, is the limit. A Main_MiSTer that does not know the attribute streams the bytes as before, with
+the same RBF and MRAs. `sim/emu/run_emu.sh` with `FAST=1` models the HPS side. This is the Metamorphic Force core's
+implementation (`mf_mem.sv`, 20261013), taken over with this core's image layout.
+
 ## Video
 
 The 8 MHz pixel clock comes from the 96 MHz system clock (a pixel every 12 clocks; a 512-pixel line is 6,144 clocks, the
@@ -77,6 +93,22 @@ whole frame periods, and the even rows are byte-identical to the 15 kHz picture;
 pixels, and the picture is the 15 kHz one smoothed (84,326 of 86,016 pixels identical, all 3,810 non-black source
 pixels still non-black; the rest are HQ2x's edges).
 
+### Scale (integer scaling for the HDMI scaler)
+
+The OSD's Scale item (`status[34:32]`: Normal, V-Integer, HV-Integer, Narrower HV-Integer, HV-Integer+) goes to the framework's
+`video_freak` (`sys/video_freak.sv`, with `sys/math.sv`), which sits behind `arcade_video` and turns the aspect ratio plus
+the picture's own size into `VIDEO_ARX` / `VIDEO_ARY`. With Normal they pass through (4:3, or the ARC entries); with an integer
+mode they carry the exact size in pixels (bit 12 set) that the scaler is to give the picture: the picture's row count times
+the largest whole factor that fits the scaler's height, and a width that is the aspect ratio's (V-Integer) or a whole multiple
+of the 384-pixel row (the HV modes: Narrower is the multiple below the aspect width, HV-Integer+ the one above, HV-Integer the
+nearer of the two). The menu's order is the user's; `video_freak`'s `SCALE` input counts 0 Normal, 1 V-Integer, 2 Narrower,
+3 HV-Integer+, 4 HV-Integer, and `ViolentStorm.sv` maps one onto the other (`scale_sel`).
+
+Full Screen (Aspect ratio ARX = ARY = 0) has no proportions for the integer rule to size the width from, and the rule then
+sizes the height from the width and asks for more rows than the screen has. With an integer Scale the core therefore hands
+`video_freak` the scaler's own size (`HDMI_WIDTH` x `HDMI_HEIGHT`) as the proportions (`fs_int`), so Full Screen is the largest
+whole-number picture in the screen's aspect; with the scaler's size unknown (direct video) it passes through as before.
+
 ## Tile ROM latency and the row cache
 
 The tilemap fetches 196 tile rows a line (four layers of 49 groups) and each fetch waits for the SDRAM: without a cache the
@@ -95,5 +127,13 @@ of 48 / 34 clocks (sprites / tiles) in 25 of 25 play frames, one frame of 25 wit
 * `sim/emu/run_sd.sh`: this core's raster (`vs_video`) into the framework's `arcade_video` with Scandoubler Fx / the forced
   scandoubler selectable, nothing else (a fast check of the 31 kHz output; `HONLY=0` reproduces the first build's frozen
   picture). `FSD=1` / `FX=n` in `run_emu.sh` do the same through the whole top level.
+  `FAST=1` models the HPS side of the MRA's `address=` attribute (the image copied into the DDR3 model, then a download with no
+  bytes): the core must come out of reset on its own, the same loader check applies, and the scaler's picture must equal the
+  streamed load's. `SCALE=0..4` / `AR=0..3` / `HW`, `HH` set the Scale item, the Aspect ratio and the scaler's output size,
+  and the bench checks the size the core asks the scaler for against the framework's integer rule, worked out independently
+  from the picture's rows and the settings. With the Diagnostic overlay on, the built-in memory test runs to its end (150
+  frames after the load) after a fast load and after a streamed one: every region read back ok and stable, the tile RAM ok,
+  and the two overlays differ only in the squares showing the 68000's instantaneous bus address (the fast load ends 250
+  clocks after the streamed one in the bench).
 * The built-in memory test (`mem_test.sv`, the diagnostic overlay's squares) reads every region back through the machine's own
   ports, twice: ok (read back what was loaded) and stable (the two passes agree), and tests the tile RAM with an address pattern.

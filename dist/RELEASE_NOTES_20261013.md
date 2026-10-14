@@ -49,6 +49,6 @@ plasticbugs' Gaiapolis core for the Analogue Pocket (the machine the Metamorphic
 20261012
 - First release: 7 MRAs (World, USA, Japan, Asia), four players, CRT Adjust, Flip Screen.
 
-Download and source: <repository URL>
+Download and source: https://github.com/decoryah/Arcade-ViolentStorm_MiSTer
 You need your own MAME 0.289 viostorm.zip.
 ```

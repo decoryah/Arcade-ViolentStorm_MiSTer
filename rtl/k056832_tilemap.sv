@@ -106,9 +106,10 @@ module k056832_tilemap #(
     localparam logic signed [9:0] OFFS_X [4] = '{ -10'sd1, 10'sd1, 10'sd3, 10'sd4 };
     localparam logic signed [9:0] OFFS_Y [4] = '{ 10'sd0, 10'sd0, 10'sd0, 10'sd0 };
 
-    // Global flip (register 0 bits 5:4). Y is supported (this game runs with it set: its data are stored "software
-    // Y-flipped"): MAME flips every page's tilemap, so a page's rows come out mirrored, its scroll is taken around
-    // the visible area's centre and the K056832's register 0x1e adds a correction. X is not (nothing uses it).
+    // Global flip (register 0 bits 5:4). Y is supported, carried over from the Metamorphic Force renderer, whose game
+    // runs with it set (its data are stored "software Y-flipped"); Violent Storm never sets it (regs[0] = 0x0044 in
+    // every state dumped): MAME flips every page's tilemap, so a page's rows come out mirrored, its scroll is taken
+    // around the visible area's centre and the K056832's register 0x1e adds a correction. X is not (nothing uses it).
     wire flip_y = regs[0][5];
     wire flip_x = regs[0][4];
     wire signed [10:0] corr_y = regs[30][10:0];            // 11-bit signed vertical offset when flipped

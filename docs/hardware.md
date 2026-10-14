@@ -46,7 +46,7 @@ MAME's line 240) at raster line 261.
 
 | Chip | Function | Here |
 |---|---|---|
-| K056832 | tilemap generator, 4 layers over a 4 x 4 grid of 64 x 32 tile pages | `K056832_BPP_5` configured, but only four planes are loaded (the fifth byte is zero); `viostorm_tile_callback`; layer offsets (-1, +1, +3, +4); the game uses the **global Y flip** (reg 0 bit 5) |
+| K056832 | tilemap generator, 4 layers over a 4 x 4 grid of 64 x 32 tile pages | `K056832_BPP_5` configured, but only four planes are loaded (the fifth byte is zero); `viostorm_tile_callback`; layer offsets (-1, +1, +3, +4); the game keeps the global X / Y flips off (`regs[0]` = 0x0044 in every state dumped and in a 36,800-frame survey; Metamorphic Force uses the Y flip, the renderer supports it) |
 | K055673 | sprite generator (K053246/7 family) | `K055673_LAYOUT_RNG` (4bpp), offsets (-62, -23), z codes honoured; `metamrph_sprite_callback` |
 | K055555 | priority encoder / layer mixer | 4 tile layers + OBJ (SUB1 is never enabled: there is no K053250) |
 | K054338 | alpha / shadow / brightness colour stage | backdrop, 3 shadow tables, 3 brightness codes, 3 mix levels |
@@ -123,6 +123,15 @@ draws a layer's tiles that carry a mix code in a separate pass at the level of t
 seen (`m_last_alpha_tile_mix_code`, a persistent member), when V_INMIX_ON does not claim the layer's codes and that level
 is below 255; every other tile takes the layer's internal level (V_INMIX & V_INMIX_ON). The tilemap carries each pixel's
 tile code (`tmix`) and the last non-zero code fetched (`last_mix`); `vs_mixer` does the rest.
+
+**Layer configuration.** `tools/lua/cfg_log.lua` of the Metamorphic Force core (logs every change of the K056832's flip,
+tile-mode, scroll-mode and page-span registers over a MAME run) over 26,800 frames of the attract mode with its demo play
+and 10,000 frames of scripted play shows one configuration after the first four frames, in both: every layer one page
+high and one page wide (start rows 0 / 1 / 0 / 1, start columns 0 / 0 / 1 / 1), **xy scroll (mode 3) on all four**, no X
+or Y flip (`regs[0]` bits 5:4 clear), `regs[0]` = 0x0044. This game does not use the line or row scroll modes or layers taller than one page, so the
+renderer's handling of those (`k056832_tilemap.sv` flags the combinations it has not been checked for as `unsupported`)
+is not reached. It matters for the Metamorphic Force Hall of Fame screen, where the same renderer drew a two-page row
+scroll layer with the wrong entries until 20261014; that fix is not in this core.
 
 The renderer's 16-bit tile codes address the first 2 MB of the 4 MB tile ROM only (MAME's callback does not extend
 them); the other half is reachable through the read-back window. The tilemap's ROM rows come through a 512-entry

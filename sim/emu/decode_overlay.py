@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Reads the diagnostic overlay out of a frame captured by tb_emu (<prefix>_scaler.ppm,
-288x224): three rows of 32 squares along the bottom, green = 1 (see ViolentStorm.sv for
+384x224): three rows of 32 squares along the bottom, green = 1 (see ViolentStorm.sv for
 the meaning of every bit and rtl/dbg_overlay.sv for the geometry).
 
     python decode_overlay.py emu2_scaler.ppm
 """
 import sys
 
-SQW = 9                                        # pixels a square (the last is the gap)
+SQW = 12                                       # pixels a square (the last is the gap)
 
 
 def load(path):
@@ -36,7 +36,7 @@ def val(b):
 
 def main():
     w, h, px = load(sys.argv[1])
-    assert (w, h) == (288, 224), (w, h)
+    assert (w, h) == (384, 224), (w, h)
     # visible lines 213..215 are row 0, 217..219 row 1, 221..223 row 2 (a black gap line between)
     rows = [bits(px, w, h, y) for y in (214, 218, 222)]
     r0, r1, r2 = rows
@@ -49,11 +49,11 @@ def main():
     print("core resets seen       %d" % val(r0[16:24]))
     print("test done=%d running=%d  tile RAM ok=%d bad(log)=%d  Z80 stepped=%d" % (r0[24], r0[25], r0[26], val(r0[27:31]), r0[31]))
     print("68000 bus address      %06x" % val(r1[0:24]))
-    reg = ["prog", "snd", "tile", "lvc", "pcm", "spr"]
+    reg = ["prog", "snd", "tile", "(none)", "pcm", "spr"]
     print("read back ok           " + "  ".join("%s=%d" % (n, v) for n, v in zip(reg, r1[24:30])) + "   sound heard=%d" % r1[31])
     print("read back stable       " + "  ".join("%s=%d" % (n, v) for n, v in zip(reg, r2[0:6])) + "   ddr fifo overflow=%d" % r2[7])
     print("overrun lines last frame %d  sprites/4 %d  unsupported=%d shadow2=%d K055550 ran=%d irq6 seen=%d"
-          " flip underrun=%d  overran(tm,lvc,spr)=%s" % (val(r2[8:16]), val(r2[16:24]), r2[24], r2[25], r2[26], r2[27], r2[28],
+          " flip underrun=%d  overran(tm,-,spr)=%s" % (val(r2[8:16]), val(r2[16:24]), r2[24], r2[25], r2[26], r2[27], r2[28],
                                                           ''.join(map(str, r2[29:32]))))
 
 
