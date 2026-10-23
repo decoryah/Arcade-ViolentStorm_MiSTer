@@ -1,18 +1,20 @@
 # Violent Storm for MiSTer
 
-A MiSTer FPGA core for **Violent Storm** (Konami, 1993), the four-player beat-'em-up on the "pre-GX" GX168 board. It is
+A MiSTer FPGA core for **Violent Storm** (Konami, 1993), the three-player beat-'em-up on the "pre-GX" GX168 board. It is
 built on the Metamorphic Force and Monster Maulers cores (which come from plasticbugs' Gaiapolis core for the Analogue
 Pocket): the same 68000 / Z80 / K056832 / K055673 / K055555 / K054338 / K054539 board family, with this game's map, a
 384 x 224 picture at an 8 MHz pixel clock and the K055550 helper chip.
 
 **Status.** The first build, `violentstorm_20261012`, was tested on a real MiSTer by the repository owner: the game works in
-all areas. It has one known fault, a frozen picture with Scandoubler Fx or `forced_scandoubler` (see below), fixed in
-`violentstorm_20261013` (tested on the board by the repository owner: it works, the scandoubler modes included). The
-current build, tested the same way, is `releases/violentstorm_20261014.rbf` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every
-clock's slack positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold), which adds **fast loading** (about a
-second with a recent Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; the owner reports that the
-build and both features work on a MiSTer. One person's test on one board, not a comparison with the arcade PCB. Everything
-in the verification table below was checked in simulation against MAME 0.289 (the benches under `sim/`).
+all areas. It had one known fault, a frozen picture with Scandoubler Fx or `forced_scandoubler` (see below), fixed in
+`violentstorm_20261013`. `violentstorm_20261014` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every clock's slack
+positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold) added **fast loading** (about a second with a recent
+Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; 20261013 and 20261014 were tested on the board by
+the owner the same way and work. The current build, `releases/violentstorm_20261022.rbf` (20,326 ALMs = 48 %, 520 / 553 M10K,
+74 / 112 DSPs, +0.21 ns setup on the core clock, +0.23 ns the tightest hold), changes the controls to the cabinet's (three
+players, Attack / Jump, see Controls below) and was tested on the board by the owner the same way. One person's test on
+one board, not a comparison with the arcade PCB. Everything in the verification table below was checked in simulation against
+MAME 0.289 (the benches under `sim/`).
 
 ## What is verified (against MAME 0.289, `viostorm`)
 
@@ -23,6 +25,7 @@ in the verification table below was checked in simulation against MAME 0.289 (th
 | K055550 | every command (memset, copy, collision list, homing vector) against a transcription of MAME's code on random programs: 1,660 commands, 0 differences; the homing vector for all 2^32 inputs |
 | Sound | the K054539 pair replayed from MAME's register log correlates 0.92-0.98 a second with MAME's own stream (the log's +-1 sample timing is the rest) |
 | Whole machine | from reset (with the power-on check skipped) to the character select: the same picture as MAME's at frames 60 and 300, and at 500 (a few frames' timeline offset); the MiSTer top level end to end (`sim/emu`: loader check of all 9.5 M words, frame period exactly 1,622,016 clocks = 59.1856 Hz, 384 x 224, EEPROM save path) passes, also with CRT Adjust on (amounts 0, and H-Size +2 / H-Position -6 / V-Shift -3: the picture exactly 400 pixels wide and 3 lines up), and the Flip Screen bench with the 384-pixel raster |
+| Controls | `sim/inputs/run.sh`: `rtl/vs_inputs.sv` against the decode the core had before (on the old pad layout) and against a table of the cabinet's names, every value of every controller and key and a million random vectors: 1,049,177 checks, 0 mismatches (a copy with attack and jump swapped fails 899,289); `sim/emu` `JOYTEST=1`: each of the 32 bits of the four controllers pressed alone through the real top level, 128 presses, 0 wrong; which inputs the game uses: see Controls below |
 
 ## Install
 
@@ -73,8 +76,24 @@ The two bootlegs in MAME (`viostormubbl`, `viostormabbl`) are not supported.
 | SDRAM read capture | Normal, Late | For a module that answers slowly |
 | Reset | | Restarts the machine |
 
-On a gamepad the default mapping is A / B / R for buttons 1 / 2 / 3, Start for Start and Select for Coin; up to four
-joysticks. From the keyboard: 1-4 start, 5-8 coin and F2 for the test switch.
+### Controls
+
+The game has three players, each with a joystick and two buttons, **Attack** and **Jump** (the names on the game's own
+I/O CHECK screen), a Start and a coin. The button-mapping dialog lists exactly those: Attack, Jump, Start, Coin.
+
+On a gamepad the default mapping is A = Attack, B = Jump, Start = Start and Select = Coin, for up to three joysticks. From
+the keyboard: 1-3 start, 5-7 coin and F2 for the test switch (MAME's keys).
+
+There is no fourth player and no third button on this cabinet, so the core has none: the program never reads the fourth
+player's input byte; its I/O CHECK screen lists LEFT, RIGHT, UP, DOWN, ATTACK, JUMP, START, SERVICE and three coin mechanisms
+for each of three players; the coin byte is masked to three coins; and holding a third button down for 2,500 frames of
+scripted play with each of the three characters (Wade, Boris, Kyle) changed nothing in the game's memory or picture. (MAME's
+port list shows three buttons and four players because it comes from Konami's shared input macro.) Earlier builds
+(`violentstorm_20261012` to `20261014`) listed Button 1-3 and mapped a fourth joystick; the new layout moves Start and Coin
+down by one place, so use the MRAs from the same zip and map the buttons again once.
+
+The game also has a service button per player (each adds a credit, and the I/O CHECK screen shows them: MAME's 9 / 0 / -
+keys). This core does not map them yet.
 
 Scandoubler Fx and MiSTer.ini's `forced_scandoubler` make the core's 15 kHz picture a 31 kHz one (every line twice; HQ2x
 and the CRT filters on top). In the first build (`violentstorm_20261012`) they gave no vertical sync at all, so the monitor

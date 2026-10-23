@@ -1,6 +1,6 @@
 ## Violent Storm for MiSTer - 20261014
 
-Konami's **Violent Storm** (1993, GX168 "pre-GX" hardware), the four-player beat-'em-up, with seven MRAs: World (EAC, EAB), USA (UAC, UAB), Japan (JAC) and Asia (AAC, AAB).
+Konami's **Violent Storm** (1993, GX168 "pre-GX" hardware), the three-player beat-'em-up, with seven MRAs: World (EAC, EAB), USA (UAC, UAB), Japan (JAC) and Asia (AAC, AAB).
 
 ### What's new since 20261013
 
@@ -57,7 +57,7 @@ plasticbugs' Gaiapolis core for the Analogue Pocket (the machine the Metamorphic
   forced_scandoubler in 20261012. The 15 kHz and direct video outputs are unchanged.
 
 20261012
-- First release: 7 MRAs (World, USA, Japan, Asia), four players, CRT Adjust, Flip Screen.
+- First release: 7 MRAs (World, USA, Japan, Asia), three players, CRT Adjust, Flip Screen.
 
 Download and source: https://github.com/decoryah/Arcade-ViolentStorm_MiSTer
 You need your own MAME 0.289 viostorm.zip.

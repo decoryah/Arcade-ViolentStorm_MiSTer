@@ -1,6 +1,6 @@
 ## Violent Storm for MiSTer - 20261013
 
-Konami's **Violent Storm** (1993, GX168 "pre-GX" hardware), the four-player beat-'em-up, with seven MRAs: World (EAC, EAB), USA (UAC, UAB), Japan (JAC) and Asia (AAC, AAB).
+Konami's **Violent Storm** (1993, GX168 "pre-GX" hardware), the three-player beat-'em-up, with seven MRAs: World (EAC, EAB), USA (UAC, UAB), Japan (JAC) and Asia (AAC, AAB).
 
 **Fixed since 20261012:** **Scandoubler Fx (HQ2x, the CRT filters) and MiSTer.ini's `forced_scandoubler` no longer freeze the picture.** With the scandoubler on, 20261012 produced no vertical sync: the monitor or the HDMI scaler saw a stream without frames, the sound played and the picture stood still (31.5 kHz in MiSTer's video info). The core's horizontal blank was high through the whole vertical blank, and the framework's scandoubler needs it to toggle on every line. It now gets the horizontal blank alone, with the vertical blank separate. The 15 kHz analog and Direct Video outputs were never affected; their picture is byte-identical to 20261012's in simulation. Nothing else changed.
 
@@ -47,7 +47,7 @@ plasticbugs' Gaiapolis core for the Analogue Pocket (the machine the Metamorphic
   (The OSD still shows v261012: that is the compile date.)
 
 20261012
-- First release: 7 MRAs (World, USA, Japan, Asia), four players, CRT Adjust, Flip Screen.
+- First release: 7 MRAs (World, USA, Japan, Asia), three players, CRT Adjust, Flip Screen.
 
 Download and source: https://github.com/decoryah/Arcade-ViolentStorm_MiSTer
 You need your own MAME 0.289 viostorm.zip.

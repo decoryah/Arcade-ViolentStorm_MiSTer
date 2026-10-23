@@ -9,7 +9,7 @@
 // Gaiapolis machine, plasticbugs' Pocket core): the same 68000 / Z80 / K056832 /
 // K055673 / K055555 / K054338 / K054539 board family and the same video
 // configuration (4bpp tiles and sprites, z codes kept, two scanline interrupts,
-// four players), on this game's map: no K053250 line-scroll plane, the K055550
+// three players), on this game's map: no K053250 line-scroll plane, the K055550
 // protection / helper chip of Monster Maulers (memset, copy, collision list,
 // homing vector), a 384 x 224 picture from an 8 MHz pixel clock.
 //
@@ -82,8 +82,8 @@ module vs_core #(
     output logic        eep_dirty,
 
     // controls, active low as the board sees them (docs/hardware.md section 8)
-    input  logic [15:0] in_p1_p3,           // 274000: P1 (low byte) and P3: left, right, up, down, button 1-3, start
-    input  logic [15:0] in_p2_p4,           // 274002
+    input  logic [15:0] in_p1_p3,           // 274000: P1 (low byte) and P3: left, right, up, down, attack, jump, (button 3), start
+    input  logic [15:0] in_p2_p4,           // 274002: P2 (low byte); the high byte is MAME's P4, which the game never reads
     input  logic  [7:0] in0,                // 278000: coin 1-4, service 1-2
     input  logic  [7:0] in1,                // 278002: EEPROM DO / READY (replaced), bit 3 the test switch, DIP bits 7:4
 

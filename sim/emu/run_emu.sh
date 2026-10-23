@@ -15,6 +15,9 @@
 # size the core asks the scaler for (VIDEO_ARX / VIDEO_ARY) is checked against the framework's rule (see tb_emu.cpp)
 # Fast load: FAST=1 models the HPS side of the MRA's address= attribute (the image copied into the DDR3, then a
 # download with no bytes) and the core replays it into its loader
+# Controls: PROBE=1 JOYTEST=1 skips the game and presses each bit of the four controllers alone (the OSD's J1 line:
+# right, left, down, up, attack, jump, start, coin, and the bits above); the board's input words inside the top level
+# must change by exactly the one bit the cabinet has for it, and the fourth controller by none
 # The image is tools/mra_build.py on a mra/*.mra (0x1240000 bytes); the EEPROM default is viostorm.nv from the romset
 # (128 bytes).
 set -e

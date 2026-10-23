@@ -217,6 +217,37 @@ int main(int argc, char **argv) {
     if (getenv("MONO") && atoi(getenv("MONO"))) set_status(8, 1);
     if (getenv("TEST") && atoi(getenv("TEST"))) set_status(6, 1);
     run(40000);                                  // SDRAM init, cache sweeps
+#ifdef PROBE
+    if (getenv("JOYTEST") && atoi(getenv("JOYTEST"))) {
+        // The controls through the real top level: each bit of each of the four controllers (the OSD's J1 line: 0 right,
+        // 1 left, 2 down, 3 up, 4 attack, 5 jump, 6 start, 7 coin; the bits above are nothing) pressed alone must clear
+        // exactly the board bit the cabinet's input words have for it, and the fourth controller none at all
+        //   board bits of a player's byte: 0 left, 1 right, 2 up, 3 down, 4 attack, 5 jump, 6 (button 3), 7 start
+        static const int board_bit[7] = { 1, 0, 3, 2, 4, 5, 7 };     // pad bit 0..6 -> board bit
+        auto set_joy = [&](int c, unsigned v) { if (c == 0) HPSV(r_joy0) = v; if (c == 1) HPSV(r_joy1) = v; if (c == 2) HPSV(r_joy2) = v; if (c == 3) HPSV(r_joy3) = v; };
+        int bad = 0, n = 0;
+        for (int c = 0; c < 4; c++) for (int b = 0; b < 32; b++) {
+            for (int k = 0; k < 4; k++) set_joy(k, 0);
+            set_joy(c, 1u << b);
+            run(8);
+            unsigned p13 = EMUV(in_p1_p3), p24 = EMUV(in_p2_p4), in0 = EMUV(in0);
+            unsigned e13 = 0xffff, e24 = 0xffff, e0 = 0xff;           // everything released
+            if (b < 7 && c == 0) e13 &= ~(1u << board_bit[b]);
+            if (b < 7 && c == 1) e24 &= ~(1u << board_bit[b]);
+            if (b < 7 && c == 2) e13 &= ~(1u << (8 + board_bit[b]));
+            if (b == 7 && c < 3) e0 &= ~(1u << c);
+            n++;
+            if (p13 != e13 || p24 != e24 || in0 != e0) {
+                bad++;
+                if (bad < 10) printf("  JOYTEST: controller %d bit %d: P1_P3 %04x (want %04x) P2_P4 %04x (want %04x) IN0 %02x (want %02x)\n", c, b, p13, e13, p24, e24, in0, e0);
+            }
+        }
+        for (int k = 0; k < 4; k++) set_joy(k, 0);
+        printf("JOYTEST: %d single-bit presses through the top level, %d wrong\n", n, bad);
+        printf("%s\n", bad ? "FAIL" : "PASS");
+        return bad ? 1 : 0;
+    }
+#endif
     if (noload) {                                // a quick check of the video path: no ROM, the overlay is the test pattern
         printf("up after %llu clocks; no image download (video-path check)\n", cycles);
         download(2, nv.data(), 128, 40);

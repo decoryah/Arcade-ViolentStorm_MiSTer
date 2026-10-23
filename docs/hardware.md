@@ -77,8 +77,8 @@ game never touches them: `tools/lua/ram_use.lua` over 3,000 frames including the
 | `264000` | W | sound IRQ (Z80 IRQ0) |
 | `268000-26801F` | RW | K054321 (low byte) |
 | `26C000-26C007`, `270000-27003F` | W | K056832 VSCCS, VACSET |
-| `274000`, `274002` | R | `P1_P3`, `P2_P4` (player 1 / 2 in the low byte, 3 / 4 in the high) |
-| `278000` | R | `IN0`: coins 1-3 (bits 2:0), service 1 / 2 (bits 5:4) |
+| `274000`, `274002` | R | `P1_P3`, `P2_P4` (player 1 / 2 in the low byte, 3 in the high byte of `274000`; the high byte of `274002`, MAME's player 4, is never read by the game) |
+| `278000` | R | `IN0`: coins 1-3 (bits 2:0; the game masks the byte with 7, so bit 3 is dead), service 1-3 (bits 6:4; bit 6 only in 3-player mode) |
 | `278002` | R | `IN1`: EEPROM DO (bit 0) / READY (bit 1), bit 2 unassigned, bit 3 test, SW1 (bits 7:4) |
 | `27C000` | W | EEPROM (DI / CS / CLK on bits 0/1/2) and the watchdog |
 | `300000-307FFF` | RW | K056832 tile RAM window (8 KB, mirrored x4; 16 pages behind regs[0x19]) |
@@ -91,9 +91,27 @@ of five bytes, the fifth never loaded), the rest read 0.
 
 ### Inputs
 
-`P1_P3` / `P2_P4`: each byte a player: bit 0 left, 1 right, 2 up, 3 down, 4-6 buttons 1-3, 7 start (active low).
-`IN1` SW1: bit 4 sound output (1 = mono), bit 5 flip screen (1 = off; held here, the picture is flipped by the frame
-buffers), bit 6 coin mechanism (1 = common), bit 7 number of players (1 = 2, 0 = 3).
+`P1_P3` / `P2_P4`: each byte a player: bit 0 left, 1 right, 2 up, 3 down, 4 attack, 5 jump, 6 button 3, 7 start (active
+low). The game has **three players with two buttons**; what the program does with the bits (who reads the words: `tools/lua/input_reads.lua` and a disassembly; what
+depends on them: `tools/lua/input_use.lua`, run by `tools/input_use.ps1`; MAME 0.289):
+
+- The input routine (`01cfa`) reads the bytes at `274001` (P1), `274003` (P2) and `274000` (P3) and keeps, per player, the
+  held bits, the previous ones, the new presses and the latched presses (`2000d0-2000e3`, copied to the player structs at
+  `200800` / `200880` / `200900`). Start is handled by the coin routine (`08dce`): `andi #$80` per player, and P3's only when
+  `200500` is set (the number-of-players DIP at `278003` bit 7 = 0, 3 players). Nothing reads `274002`; the coin byte is
+  masked with 7 (coins 1-3) and the service bits with `$30`, or `$70` in 3-player mode: a service press adds a credit.
+- The program's own I/O CHECK screen (strings at `0784ca`) has, for PLAYER 1 / 2 / 3: LEFT, RIGHT, UP, DOWN, ATTACK, JUMP,
+  START, SERVICE; then COIN MECH SWITCH 1-3 and TEST SWITCH. The DIP screen says "1 PLAYER ATTACK = EXIT". There is no third
+  button and no fourth player; MAME lists them because `KONAMI16_LSB` / `MSB` define a third button and the table a fourth
+  player for every board of the family.
+- Measured (`tools/input_use.ps1`): scripted play from the same clean state, the sprite RAM and the work RAM checksummed
+  every 25 frames with the raw input bytes left out. The baseline run twice: identical. P1's button 1 or button 2 never
+  pressed: the game differs from the baseline from 25 / 175 frames after the buttons start (frame 500). P1's button 3 never
+  pressed (4,000 frames), or held down from frame 600 (2,500 frames, with each of Wade, Boris and Kyle, picked with the
+  cursor on the select screen): identical throughout. In the service menu (test switch on) button 1 changes the program's
+  state at once (it leaves the menu), button 3 of P1, P2 or P3 changes nothing. The code that tests bit 6 is the shared
+  player / enemy state machine (`34b06` ...: `($2,A3)` is the controller struct of whichever object it runs for, the enemies'
+  included) and a hidden combination of P2 in the test menu (`05f9e`).
 
 ## 4. The K055550 (`rtl/k055550.sv`)
 

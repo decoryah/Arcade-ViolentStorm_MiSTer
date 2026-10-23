@@ -8,7 +8,7 @@
 //  Maulers, Metamorphic Force and Violent Storm are boards of the same family (MAME's
 //  mystwarr.cpp), and this is that machine adapted to this game (4bpp tiles and sprites with z
 //  codes, no K053250, the K055550 helper chip with its collision and homing commands, a 384 x 224
-//  picture from an 8 MHz pixel clock, two scanline interrupts, four players). This file is its
+//  picture from an 8 MHz pixel clock, two scanline interrupts, three players). This file is its
 //  MiSTer platform layer: memory (target/mister), clocks, video, audio, controls and ROM/NVRAM
 //  loading through the MiSTer framework.
 //
@@ -102,8 +102,8 @@ localparam CONF_STR = {
 	"O[10],SDRAM read capture,Normal,Late;",
 	"-;",
 	"R0,Reset;",
-	"J1,Button 1,Button 2,Button 3,Start,Coin;",
-	"jn,A,B,R,Start,Select;",
+	"J1,Attack,Jump,Start,Coin;",
+	"jn,A,B,Start,Select;",
 	"V,v",`BUILD_DATE
 };
 
@@ -135,7 +135,7 @@ wire         ioctl_rd;
 wire         ioctl_wait;
 reg          ioctl_upload_req;
 
-wire  [31:0] joystick_0, joystick_1, joystick_2, joystick_3;
+wire  [31:0] joystick_0, joystick_1, joystick_2;     // three players: the game never reads a fourth
 wire  [10:0] ps2_key;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
@@ -167,14 +167,13 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joystick_2(joystick_2),
-	.joystick_3(joystick_3),
 	.ps2_key(ps2_key)
 );
 
 ///////////////////////   CONTROLS   ///////////////////////
 
-// keyboard: 1-4 start, 5-8 coin, F2 test (MAME's defaults)
-reg [3:0] key_start, key_coin;
+// keyboard: 1-3 start, 5-7 coin, F2 test (MAME's defaults; the game has three players)
+reg [2:0] key_start, key_coin;
 reg       key_test;
 always @(posedge clk_sys) begin
 	reg old_stb;
@@ -184,35 +183,26 @@ always @(posedge clk_sys) begin
 			8'h16: key_start[0] <= ps2_key[9];      // 1
 			8'h1E: key_start[1] <= ps2_key[9];      // 2
 			8'h26: key_start[2] <= ps2_key[9];      // 3
-			8'h25: key_start[3] <= ps2_key[9];      // 4
 			8'h2E: key_coin[0]  <= ps2_key[9];      // 5
 			8'h36: key_coin[1]  <= ps2_key[9];      // 6
 			8'h3D: key_coin[2]  <= ps2_key[9];      // 7
-			8'h3E: key_coin[3]  <= ps2_key[9];      // 8
 			8'h06: key_test     <= ps2_key[9];      // F2
 			default: ;
 		endcase
 	end
 end
 
-// joystick bits: 0 right, 1 left, 2 down, 3 up, 4-6 buttons 1-3, 7 start, 8 coin
-wire [31:0] joy [4];
-assign joy[0] = joystick_0; assign joy[1] = joystick_1; assign joy[2] = joystick_2; assign joy[3] = joystick_3;
-
-// a player's byte as the board's input words carry it, active low (MAME's KONAMI16_LSB / MSB):
-//   bit0 left, 1 right, 2 up, 3 down, 4-6 buttons 1-3, 7 start
-function automatic [7:0] pbyte(input [31:0] j, input kstart);
-	pbyte = ~{j[7] | kstart, j[6], j[5], j[4], j[2], j[3], j[0], j[1]};
-endfunction
-
+// the board's player and coin words from the controllers (bits 0 right, 1 left, 2 down, 3 up, 4 attack, 5 jump,
+// 6 start, 7 coin: the J1 line above) and the keys; rtl/vs_inputs.sv
 wire        test_sw = status[6] | key_test;
-//   274000: P1 low byte, P3 high byte;  274002: P2 low byte, P4 high byte
-wire [15:0] in_p1_p3 = {pbyte(joy[2], key_start[2]), pbyte(joy[0], key_start[0])};
-wire [15:0] in_p2_p4 = {pbyte(joy[3], key_start[3]), pbyte(joy[1], key_start[1])};
-//   278000: coin 1-3 (bits 2:0; bit 3 unassigned, kept for the fourth player's coin), service 1-2 (bits 5:4, not wired
-//   here), bits 7:6 unassigned: all active low
-wire  [7:0] in0      = ~{2'b00, 2'b00,
-                         joy[3][8] | key_coin[3], joy[2][8] | key_coin[2], joy[1][8] | key_coin[1], joy[0][8] | key_coin[0]};
+wire [15:0] in_p1_p3, in_p2_p4;
+wire  [7:0] in0;
+vs_inputs vs_inputs
+(
+	.joy0(joystick_0[7:0]), .joy1(joystick_1[7:0]), .joy2(joystick_2[7:0]),
+	.key_start(key_start), .key_coin(key_coin),
+	.in_p1_p3(in_p1_p3), .in_p2_p4(in_p2_p4), .in0(in0)
+);
 //   278002 (low byte): bits 1:0 the EEPROM's DO / READY (replaced in the core), bit 2 an unassigned input the game
 //   polls for 0, bit 3 the test switch (low = on), then SW1: bit 4 sound output (0 stereo), bit 5 flip screen (1 off,
 //   held: the picture is flipped by the frame buffers, as in the Monster Maulers core), bit 6 coin mechanism
