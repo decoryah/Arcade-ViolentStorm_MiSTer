@@ -29,6 +29,13 @@
 //     layer of the frame before).
 //   * Shadow: the pixel's colour as RGB15 expanded, plus the K054338's signed
 //     delta for the shadow table (-80 for table 3), clamped unless CLIPSL.
+//   * bri_post (the OSD's Colours = Board DAC): the board dims in its video DACs
+//     (the K054338's brightness output sets the 054573s' current through a 054574),
+//     after the mix and the DAC's curve; MAME scales each colour before mixing.
+//     With bri_post the colours are mixed unscaled and `bri` says, per pixel, the
+//     brightness of the last colour drawn there (a shadow keeps it; the backdrop
+//     counts as full, as MAME draws it), for vs_dac to apply. Without it `bri` is
+//     still that value, but the colour is MAME's.
 //
 // One pixel takes a mixer core 16 clocks. `phase` is 0 in the first clock the new pixel's inputs
 // are visible; they are latched at the end of phase 1, the seven slots ranked in
@@ -47,6 +54,7 @@ module vs_mixer_core (
     input  logic        clk,
     input  logic        reset,
     input  logic        cen_pix,        // the pixel tick the phases count from
+    input  logic        bri_post,       // leave the brightness to the DACs (see the header)
 
     // per-pixel inputs, all valid together
     input  logic [10:0] tm_pen [4],     // palette entries
@@ -72,6 +80,7 @@ module vs_mixer_core (
     input  logic [23:0] pal_q,
 
     output logic [23:0] rgb,
+    output logic  [7:0] bri,            // the pixel's brightness (see the header)
 
     // the K054338 alpha levels, for the sprite list builder (mix codes 1-3)
     output logic  [3:1] mix_zero,       // level 0 and not additive: the sprite is not drawn
@@ -251,7 +260,7 @@ module vs_mixer_core (
     logic        s1_v, s2_v, s3_v, s4_v;
     logic  [1:0] s1_kind, s2_kind, s3_kind, s4_kind;
     logic  [7:0] s1_alp, s2_alp, s3_alp, s4_alp;
-    logic  [7:0] s1_bri, s2_bri;
+    logic  [7:0] s1_bri, s2_bri, sx_bri, s3_bri, s4_bri;
     logic        s1_first, s2_first, s3_first, s4_first;
     logic  [1:0] s1_stab, s2_stab, s3_stab, s4_stab;
 
@@ -276,11 +285,12 @@ module vs_mixer_core (
     logic        sx_v, sx_first;
     logic  [1:0] sx_kind, sx_stab;
     logic  [7:0] sx_alp;
+    wire   [7:0] mul_bri = bri_post ? 8'hff : s2_bri;           // c * 255 / 255 = c: the colour unscaled
     always_ff @(posedge clk) begin
-        x_r <= pal_q[23:16] * s2_bri;
-        x_g <= pal_q[15:8]  * s2_bri;
-        x_b <= pal_q[7:0]   * s2_bri;
-        sx_v <= s2_v; sx_kind <= s2_kind; sx_alp <= s2_alp; sx_first <= s2_first; sx_stab <= s2_stab;
+        x_r <= pal_q[23:16] * mul_bri;
+        x_g <= pal_q[15:8]  * mul_bri;
+        x_b <= pal_q[7:0]   * mul_bri;
+        sx_v <= s2_v; sx_kind <= s2_kind; sx_alp <= s2_alp; sx_first <= s2_first; sx_stab <= s2_stab; sx_bri <= s2_bri;
     end
     function automatic logic [7:0] fin255(input logic [15:0] x);
         logic [16:0] y;
@@ -292,7 +302,7 @@ module vs_mixer_core (
         sc_r <= fin255(x_r);
         sc_g <= fin255(x_g);
         sc_b <= fin255(x_b);
-        s3_v <= sx_v; s3_kind <= sx_kind; s3_alp <= sx_alp; s3_first <= sx_first; s3_stab <= sx_stab;
+        s3_v <= sx_v; s3_kind <= sx_kind; s3_alp <= sx_alp; s3_first <= sx_first; s3_stab <= sx_stab; s3_bri <= sx_bri;
     end
 
     // t+4: source * level, a stage ahead of the painter's step (which then has the
@@ -303,7 +313,7 @@ module vs_mixer_core (
     always_ff @(posedge clk) begin
         sa_r <= sc_r * s3_alp; sa_g <= sc_g * s3_alp; sa_b <= sc_b * s3_alp;
         cs_r <= sc_r; cs_g <= sc_g; cs_b <= sc_b;
-        s4_v <= s3_v; s4_kind <= s3_kind; s4_alp <= s3_alp; s4_first <= s3_first; s4_stab <= s3_stab;
+        s4_v <= s3_v; s4_kind <= s3_kind; s4_alp <= s3_alp; s4_first <= s3_first; s4_stab <= s3_stab; s4_bri <= s3_bri;
         s4_ia <= 9'd256 - {1'b0, s3_alp};
     end
 
@@ -359,6 +369,14 @@ module vs_mixer_core (
     end
     assign rgb = bd_q ? bdc_q : dst;
 
+    // the brightness the DACs get: the last colour drawn (solid, blended or added; a shadow keeps it), the backdrop full
+    logic [7:0] dbri;
+    always_ff @(posedge clk) begin
+        if (s4_first) dbri <= 8'hff;
+        if (s4_v && s4_kind != 2'd3) dbri <= s4_bri;
+    end
+    assign bri = bd_q ? 8'hff : dbri;
+
     /* verilator lint_off UNUSEDSIGNAL */
     wire unused = ^{k38regs[0][15:8], reset, s4_alp};
     /* verilator lint_on UNUSEDSIGNAL */
@@ -379,6 +397,7 @@ module vs_mixer (
     input  logic        clk,
     input  logic        reset,
     input  logic        cen_pix,
+    input  logic        bri_post,
 
     input  logic [10:0] tm_pen [4],
     input  logic  [3:0] tm_opq,
@@ -401,6 +420,7 @@ module vs_mixer (
     input  logic [23:0] pal_q,
 
     output logic [23:0] rgb,
+    output logic  [7:0] bri,
 
     output logic  [3:1] mix_zero,
     output logic  [3:1] mix_full
@@ -417,26 +437,28 @@ module vs_mixer (
 
     logic [10:0] pal_a, pal_b;
     logic [23:0] rgb_a, rgb_b;
+    logic  [7:0] bri_a, bri_b;
     logic  [3:1] mz_a, mf_a, mz_b, mf_b;
     vs_mixer_core u_a (
-        .clk(clk), .reset(reset), .cen_pix(cen_a),
+        .clk(clk), .reset(reset), .cen_pix(cen_a), .bri_post(bri_post),
         .tm_pen(tm_pen), .tm_opq(tm_opq), .tm_mix(tm_mix), .tile_mix(tile_mix), .roz_pen(roz_pen), .roz_opq(roz_opq),
         .spr_opq(spr_opq), .spr_pen(spr_pen), .spr_pri(spr_pri), .spr_mix(spr_mix),
         .spr_shadow(spr_shadow), .spr_shtab(spr_shtab), .spr_shpri(spr_shpri),
         .k55regs(k55regs), .k38regs(k38regs),
-        .pal_addr(pal_a), .pal_q(pal_q), .rgb(rgb_a), .mix_zero(mz_a), .mix_full(mf_a)
+        .pal_addr(pal_a), .pal_q(pal_q), .rgb(rgb_a), .bri(bri_a), .mix_zero(mz_a), .mix_full(mf_a)
     );
     vs_mixer_core u_b (
-        .clk(clk), .reset(reset), .cen_pix(cen_b),
+        .clk(clk), .reset(reset), .cen_pix(cen_b), .bri_post(bri_post),
         .tm_pen(tm_pen), .tm_opq(tm_opq), .tm_mix(tm_mix), .tile_mix(tile_mix), .roz_pen(roz_pen), .roz_opq(roz_opq),
         .spr_opq(spr_opq), .spr_pen(spr_pen), .spr_pri(spr_pri), .spr_mix(spr_mix),
         .spr_shadow(spr_shadow), .spr_shtab(spr_shtab), .spr_shpri(spr_shpri),
         .k55regs(k55regs), .k38regs(k38regs),
-        .pal_addr(pal_b), .pal_q(pal_q), .rgb(rgb_b), .mix_zero(mz_b), .mix_full(mf_b)
+        .pal_addr(pal_b), .pal_q(pal_q), .rgb(rgb_b), .bri(bri_b), .mix_zero(mz_b), .mix_full(mf_b)
     );
     // in an even period (odd == 0) A mixes the pixel in progress and B holds the pixel before it
     assign pal_addr = odd ? pal_b : pal_a;
     assign rgb      = odd ? rgb_a : rgb_b;
+    assign bri      = odd ? bri_a : bri_b;
     assign mix_zero = mz_a;
     assign mix_full = mf_a;
     /* verilator lint_off UNUSEDSIGNAL */

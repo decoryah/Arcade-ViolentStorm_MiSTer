@@ -10,10 +10,13 @@ all areas. It had one known fault, a frozen picture with Scandoubler Fx or `forc
 `violentstorm_20261013`. `violentstorm_20261014` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every clock's slack
 positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold) added **fast loading** (about a second with a recent
 Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; 20261013 and 20261014 were tested on the board by
-the owner the same way and work. The current build, `releases/violentstorm_20261022.rbf` (20,326 ALMs = 48 %, 520 / 553 M10K,
-74 / 112 DSPs, +0.21 ns setup on the core clock, +0.23 ns the tightest hold), changes the controls to the cabinet's (three
-players, Attack / Jump, see Controls below) and was tested on the board by the owner the same way. One person's test on
-one board, not a comparison with the arcade PCB. Everything in the verification table below was checked in simulation against
+the owner the same way and work. `violentstorm_20261022` (20,326 ALMs = 48 %, 520 / 553 M10K, 74 / 112 DSPs, +0.21 ns
+setup on the core clock, +0.23 ns the tightest hold) changed the controls to the cabinet's (three players, Attack / Jump, see
+Controls below) and was tested on the board by the owner the same way. The current build, `releases/violentstorm_20261024.rbf`
+(20,446 ALMs = 49 %, 537 / 553 M10K, 74 / 112 DSPs, +0.36 ns setup on the core clock, +0.25 ns the tightest hold), adds the
+**Colours** option (Board DAC, the default: the board's video DACs, fitted to a recording of a real PCB; see Colours below)
+and was tested on the board by the owner the same way: the colours are right. One person's tests on one board; the colours were compared with a recording of an
+arcade PCB, the rest was not. Everything in the verification table below was checked in simulation against
 MAME 0.289 (the benches under `sim/`).
 
 ## What is verified (against MAME 0.289, `viostorm`)
@@ -26,6 +29,7 @@ MAME 0.289 (the benches under `sim/`).
 | Sound | the K054539 pair replayed from MAME's register log correlates 0.92-0.98 a second with MAME's own stream (the log's +-1 sample timing is the rest) |
 | Whole machine | from reset (with the power-on check skipped) to the character select: the same picture as MAME's at frames 60 and 300, and at 500 (a few frames' timeline offset); the MiSTer top level end to end (`sim/emu`: loader check of all 9.5 M words, frame period exactly 1,622,016 clocks = 59.1856 Hz, 384 x 224, EEPROM save path) passes, also with CRT Adjust on (amounts 0, and H-Size +2 / H-Position -6 / V-Shift -3: the picture exactly 400 pixels wide and 3 lines up), and the Flip Screen bench with the 384-pixel raster |
 | Controls | `sim/inputs/run.sh`: `rtl/vs_inputs.sv` against the decode the core had before (on the old pad layout) and against a table of the cabinet's names, every value of every controller and key and a million random vectors: 1,049,177 checks, 0 mismatches (a copy with attack and jump swapped fails 899,289); `sim/emu` `JOYTEST=1`: each of the 32 bits of the four controllers pressed alone through the real top level, 128 presses, 0 wrong; which inputs the game uses: see Controls below |
+| Colours | `sim/dac/run.sh`: `rtl/vs_dac.sv` against its table, every code at every brightness step and 100,000 random pixels with the mode switching, 120,480 pixels, 0 wrong (a copy with red and green swapped fails 58,362); the frame corpus with Colours = MAME 86 of 86 pixel-identical, and in Board DAC mode 86 of 86 (all at full brightness, the brightness passed on 255 everywhere); four MAME states in the middle of fades (register 11 = 215 / 135 / 225 / 185): MAME's colours identical to MAME's snapshots, Board DAC's mix identical to the same state at full brightness, the brightness the register's on every pixel that is not black; `sim/emu` (90 frames after a fast load): Colours = MAME byte-identical to the builds before, Board DAC that picture through the curve exactly, the geometry unchanged |
 
 ## Install
 
@@ -67,6 +71,7 @@ The two bootlegs in MAME (`viostormubbl`, `viostormabbl`) are not supported.
 | Scale | Normal, V-Integer, HV-Integer, Narrower HV-Integer, HV-Integer+ | Integer scaling for the HDMI scaler (the framework's `video_freak`; the 15 kHz analog output is not touched). Normal leaves the picture's size to the scaler. The modes work from the finished picture (the scandoubler and CRT Adjust included) and the scaler's own output size; Full Screen has no proportions for the integer rule to size the width from, so with an integer Scale it is given the screen's own |
 | Flip Screen | Off, On | The picture turned 180 degrees on every output (a frame buffer in the DDR3: one frame of delay while on) |
 | Scandoubler Fx | None, HQ2x, CRT 25%, CRT 50%, CRT 75% | |
+| Colours | Board DAC, MAME | Board DAC (the default): the colours as the board's video DACs give them, the game's fades included; MAME: the palette's values as MAME shows them. See Colours |
 | CRT Adjust | submenu: Off, On; H-Size 0..+2 / -16..-1, H-Position -48..+20, V-Shift -16..+15 | Fits the picture to a 15 kHz analog output. Does nothing while the scandoubler is in use |
 | Number of Players | 2, 3 | The board's DIP |
 | Coin Mechanism | Common, Independent | The board's DIP |
@@ -103,6 +108,28 @@ the whole vertical blank. Fixed in `violentstorm_20261013`: the core now gives i
 `vs_video.sv`) with the vertical blank separate (the same fix as Gaiapolis's `gaiapolis_20261011`). With the 15 kHz output
 the picture and its timing are as they were (byte-identical in the top-level bench).
 
+### Colours
+
+The board does not show the palette's values as they are. Each colour channel goes through a Konami 054573 video DAC whose
+output rises faster near the top, so mid tones are darker than a straight line gives, and the game fades every screen with
+the K054338's brightness, which dims those DACs (through a 054574) after the colours are mixed. MAME shows the palette's
+8-bit values as they are and fades by scaling each colour before mixing.
+
+**Colours = Board DAC** (the default) does what the board does: the mixer mixes the colours at full brightness and passes
+each pixel's brightness on, and `rtl/vs_dac.sv` turns the two into the output colour with one table
+(`rtl/data/k054573_dac.hex` from `tools/make_dac_table.py`: 64 brightness steps x 256 codes, 16 RAM blocks). At full
+brightness the codes 0 / 64 / 128 / 192 / 255 come out as 0 / 21 / 60 / 123 / 255. **Colours = MAME** passes the mixer's
+colours through unchanged: MAME's picture, pixel for pixel.
+
+The table is the 054573 circuit the Gaiapolis core traced from Ace's reproduction board, fitted to BB4's
+[recording](https://www.youtube.com/watch?v=0hEZvGd4whM) of a real Violent Storm PCB (VER. EAB, through an OSSC, a
+Framemeister and an Elgato capture; that chain's gain and offset per channel fitted out), against MAME's frames of the
+same screens (`docs/hardware.md`, "Colours"):
+- Five still screens (the intro's car, girl and bike, the title, the player select): MAME's values are 12.9 levels rms (of
+  255) from the board, the DAC model 3.7 at the Gaiapolis core's 14.5 mA (3.4 at its best for this recording).
+- The player select's fade-out, 44 frames, each with the brightness MAME's register gives it: this design 12.7 rms (the
+  still frames: about 10), MAME's colours 24.9, the same curve applied after MAME's digital fade 29.5.
+
 ## What differs from Metamorphic Force
 
 | | Metamorphic Force | Violent Storm |
@@ -123,7 +150,9 @@ the picture and its timing are as they were (byte-identical in the top-level ben
   the whole ROM is reachable through the 310000 read-back window the power-on check uses.
 * `m_last_alpha_tile_mix_code` (the category-1 tiles' level) follows the tiles in raster order here, MAME's tilemap
   decode order there; identical in every corpus frame.
-* No hardware test yet; no later-stage or boss corpus yet (see `PLAN.md`).
+* Colours: by default (Colours = Board DAC) the output follows the board's video DACs and fades in them; Colours = MAME
+  gives MAME's linear palette and MAME's fades, pixel for pixel.
+* No later-stage or boss corpus yet (see `PLAN.md`).
 
 ## Repository layout
 
@@ -166,13 +195,27 @@ frozen states, `sim/run_frames.sh` renders it and compares with MAME's snapshots
   vendored under `modules/`.
 * **Claude** (Anthropic's AI model, used through Claude Code) -- the Violent Storm machine changes and the MiSTer
   layer, written together with the repository owner: the K055550, the 384-pixel raster and the two-core mixer, the
-  tile mix codes and row cache, the ROM path, the simulation benches and this documentation.
+  tile mix codes and row cache, the ROM path, the controls, the Colours stage, the simulation benches and this
+  documentation. The hardware testing is the owner's.
 * **Sorgelig** and the MiSTer team -- the framework (`sys/`, GPL).
+* The repository owner's other cores: the machine came from the Metamorphic Force and Monster Maulers cores; fast loading
+  and the Scale option were worked out in the Metamorphic Force core, and the scandoubler fix and the 054573 DAC model
+  behind the Colours option (with the finding that the board dims in its DACs) in the Gaiapolis core, and brought over here.
 * **rmonic79** (Umberto Parisi), with help from **Andrea Bogazzi** (asturur) --
   [MiSTer-CRT-Adjust](https://github.com/rmonic79/MiSTer-CRT-Adjust), the module behind the CRT Adjust options
-  (`modules/crt-adjust/crt_adjust.sv`; GPL-3.0 or later).
+  (`modules/crt-adjust/crt_adjust.sv`, with a one-line sign fix noted in `modules/VENDOR.md`; GPL-3.0 or later).
 * **furrtek** -- [SiliconRE](https://github.com/furrtek/SiliconRE/tree/master/Konami)'s silicon-traced models and notes of
-  the K053252 timing chip (the raster, run here as `sim/k053252`), the K054338 and K055555.
+  the K053252 timing chip (the raster, run here as `sim/k053252`), the K054338 and K055555. Its
+  [K054338 trace](https://github.com/furrtek/SiliconRE/tree/master/Konami/054338) (plain 8-bit arithmetic, no curve inside
+  the chip), **Franck78**'s [Konami Gaiapolis schematic](https://github.com/Franck78/The-Konami-Gaiapolis-schematic)
+  (PWB353396A: the K054338's colours to three K054573 DACs, its brightness to a K054574, the same chips as on this board
+  family) and **Ace**'s Gerbers and BOM of the
+  [K054573 / K054574 reproductions](https://www.ukvac.com/forum/threads/konami-054573-and-054574-reproductions.84054/)
+  (which list Violent Storm among their games; the circuit the Colours table models) are the basis of the Colours option.
+* **BB4** -- the recording
+  [VIOLENT STORM Arcade Real Hardware Framemeister + OSSC](https://www.youtube.com/watch?v=0hEZvGd4whM) (YouTube, @Bun74): a real VER. EAB
+  PCB through a Sigma AV5000 supergun, an OSSC, a Framemeister and an Elgato HD60S, the whole game. The Colours table,
+  its curve and its fades, is fitted to it.
 * **Jose Tejada (jotego)** -- JTFRAME's MiSTer SDRAM clock phase and read-capture timing, which this core's PLL and
   controller settings follow; and, with the other authors of the independent Konami cores read as references (jlrh's
   `konami-fpga`, ppriest's `Arcade-KonamiGX_MiSTer`), the cross-checks of the K054338, K055555, K056832 and K055673.

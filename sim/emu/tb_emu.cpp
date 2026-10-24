@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
         if (getenv("AR")) field(121, 2, atoi(getenv("AR")));
     }
     if (getenv("MONO") && atoi(getenv("MONO"))) set_status(8, 1);
+    if (getenv("COLOURS") && !strcmp(getenv("COLOURS"), "mame")) set_status(35, 1);   // the OSD's Colours = MAME (default Board DAC)
     if (getenv("TEST") && atoi(getenv("TEST"))) set_status(6, 1);
     run(40000);                                  // SDRAM init, cache sweeps
 #ifdef PROBE

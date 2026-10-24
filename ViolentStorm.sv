@@ -86,6 +86,7 @@ localparam CONF_STR = {
 	"O[34:32],Scale,Normal,V-Integer,HV-Integer,Narrower HV-Integer,HV-Integer+;",
 	"O[12],Flip Screen,Off,On;",
 	"O[5:3],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"O[35],Colours,Board DAC,MAME;",
 	"P1,CRT Adjust;",
 	"P1O[14],CRT Adjust,Off,On;",
 	"H1P1O[19:15],CRT H-Size,0,+1,+2,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
@@ -343,9 +344,11 @@ wire        dbg_overrun_line;
 wire        dbg_step, dbg_irq5, dbg_irq6, dbg_overrun, dbg_unsupported, dbg_shadow_overlap, dbg_zstep, dbg_zwait, dbg_k550_busy;
 wire  [2:0] dbg_overrun_src;
 
+// Colours (status[35]): 0 Board DAC, the board's video DACs (their curve, and the brightness applied in them: rtl/vs_dac.sv),
+// 1 MAME, the palette's values as they are
 vs_core #(.HEXDIR("rtl/data")) mf
 (
-	.clk(clk_sys), .reset(vs_reset), .vid_reset(~pll_locked),
+	.clk(clk_sys), .reset(vs_reset), .vid_reset(~pll_locked), .board_dac(~status[35]),
 	.prog_req(prog_req), .prog_addr(prog_addr), .prog_ack(prog_ack), .prog_q(prog_q),
 	.tile_req(tile_req), .tile_addr(tile_addr), .tile_ack(tile_ack), .tile_q(tile_q),
 	.spr_req(spr_req), .spr_addr(spr_addr), .spr_ack(spr_ack), .spr_q(spr_q),

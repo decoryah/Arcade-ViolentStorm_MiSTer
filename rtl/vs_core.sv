@@ -88,6 +88,7 @@ module vs_core #(
     input  logic  [7:0] in1,                // 278002: EEPROM DO / READY (replaced), bit 3 the test switch, DIP bits 7:4
 
     // video, 6 MHz pixel rate on cen_pix
+    input  logic        board_dac,      // the OSD's Colours: 1 the board's DACs (rtl/vs_dac.sv), 0 MAME's linear palette
     output logic        cen_pix,
     output logic [23:0] rgb,
     output logic        hsync,
@@ -142,10 +143,13 @@ module vs_core #(
         .hsync(hsync_v), .vsync(vsync_v), .de(de_v), .hde(hde_v), .vblank(vblank_v), .vblank_rise(vblank_rise)
     );
     // the mixer returns a pixel's colour one pixel period late (vs_mixer: two cores on alternate pixels, each
-    // with the 16 clocks its blending takes), so the picture's de and sync signals follow a pixel later too
+    // with the 16 clocks its blending takes) and the DAC stage one more (vs_dac), so the picture's de and sync
+    // signals follow two pixels later
     logic hsync_v, vsync_v, de_v, hde_v, vblank_v;
+    logic hsync_1, vsync_1, de_1, hde_1, vblank_1;
     always_ff @(posedge clk) if (cen_pix) begin
-        hsync <= hsync_v; vsync <= vsync_v; de <= de_v; hde <= hde_v; vblank <= vblank_v;
+        hsync_1 <= hsync_v; vsync_1 <= vsync_v; de_1 <= de_v; hde_1 <= hde_v; vblank_1 <= vblank_v;
+        hsync <= hsync_1; vsync <= vsync_1; de <= de_1; hde <= hde_1; vblank <= vblank_1;
     end
     assign dbg_vcount = vcount;
 
@@ -383,14 +387,20 @@ module vs_core #(
         .c1_req(csrom_req), .c1_addr(csrom_addr), .c1_ack(csrom_ack),
         .m_req(spr_req), .m_addr(spr_addr), .m_ack(spr_ack), .m_q(spr_q), .q()
     );
+    logic [23:0] mix_rgb;
+    logic  [7:0] mix_bri;
     vs_mixer u_mx (
-        .clk(clk), .reset(reset), .cen_pix(cen_pix),
+        .clk(clk), .reset(reset), .cen_pix(cen_pix), .bri_post(board_dac),
         .tm_pen(tm_pen), .tm_opq(tm_opq & {4{px_valid}}), .tm_mix(tm_mix), .tile_mix(tile_mix), .roz_pen(11'd0), .roz_opq(1'b0),
         .spr_opq(spr_opq & px_valid), .spr_pen(spr_pen), .spr_pri(spr_pri), .spr_mix(spr_mix),
         .spr_shadow(spr_shadow & px_valid), .spr_shtab(spr_shtab), .spr_shpri(spr_shpri),
         .k55regs(k55regs), .k38regs(k38regs),
-        .pal_addr(pal_raddr), .pal_q(pal_q), .rgb(rgb),
+        .pal_addr(pal_raddr), .pal_q(pal_q), .rgb(mix_rgb), .bri(mix_bri),
         .mix_zero(mix_zero), .mix_full(mix_full)
+    );
+    // the board's video DACs: the curve and the brightness (Colours = Board DAC), or MAME's colour as it is
+    vs_dac #(.HEXDIR(HEXDIR)) u_dac (
+        .clk(clk), .cen_pix(cen_pix), .board_dac(board_dac), .rgb_in(mix_rgb), .bri_in(mix_bri), .rgb_out(rgb)
     );
 
     // K054321 master volume, 2^((v - 40) / 10) as Q4.12 from the table, and

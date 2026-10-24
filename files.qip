@@ -17,6 +17,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/k055550.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/k054321.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/k054539.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/vs_mixer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vs_dac.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/k056832_tilemap.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ram_arb2.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/rom_arb2.sv

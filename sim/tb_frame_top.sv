@@ -26,6 +26,8 @@ module tb_frame_top #(
     input  logic        tab_we,  input logic tab_sel, input logic [10:0] tab_waddr, input logic [23:0] tab_wdata,
 
     // ---- control ----
+    input  logic        bri_post,       // the mixer's Board DAC mode: colours unscaled, brightness on `bri`
+    output logic  [7:0] bri,
     input  logic        build,
     output logic        build_done,
     input  logic        line_start,
@@ -233,12 +235,12 @@ module tb_frame_top #(
     end
 
     vs_mixer u_mx (
-        .clk(clk), .reset(reset), .cen_pix(cen_pix),
+        .clk(clk), .reset(reset), .cen_pix(cen_pix), .bri_post(bri_post),
         .tm_pen(tm_pen), .tm_opq(tm_opq & {4{px_valid}}), .tm_mix(tm_mix), .tile_mix(tile_mix), .roz_pen(11'd0), .roz_opq(1'b0),
         .spr_opq(spr_opq & px_valid), .spr_pen(spr_pen), .spr_pri(spr_pri), .spr_mix(spr_mix),
         .spr_shadow(spr_shadow & px_valid), .spr_shtab(spr_shtab), .spr_shpri(spr_shpri),
         .k55regs(k55regs), .k38regs(k38regs),
-        .pal_addr(pal_addr), .pal_q(pal_q), .rgb(rgb),
+        .pal_addr(pal_addr), .pal_q(pal_q), .rgb(rgb), .bri(bri),
         .mix_zero(mix_zero), .mix_full(mix_full)
     );
     /* verilator lint_off UNUSEDSIGNAL */

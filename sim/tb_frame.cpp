@@ -2,6 +2,8 @@
 // frozen state, out as RGB for comparison against MAME's snapshot of the same frame.
 //
 //   tb_frame <state.txt> <image.rom> <zoom.hex> <recip.hex> <out.rgb>
+// BRI_POST=1: the mixer's Board DAC mode (colours mixed unscaled); BRI_OUT=<file>: the per-pixel brightness the mixer
+// passes on, one byte a pixel
 // The image is the flat ROM image the core loads (tools/mra_build.py on mra/*.mra).
 #include "Vtb_frame_top.h"
 #include "verilated.h"
@@ -136,6 +138,8 @@ int main(int argc, char **argv) {
     printf("object list built in %ld clocks%c", c, 10);
 
     std::vector<unsigned> out(VIS_H * VIS_W, 0);
+    std::vector<unsigned char> outb(VIS_H * VIS_W, 0);
+    dut->bri_post = getenv("BRI_POST") ? 1 : 0;
     long worst = 0, worst_tm = 0, worst_dr = 0;
     long hist[64] = {0}, worst_hist[64] = {0}; int worst_hist_line = -1;
     // TCACHE=1: replay the tile ROM requests through direct-mapped row caches of several sizes (a study)
@@ -225,12 +229,12 @@ int main(int argc, char **argv) {
             // the mixer latches and sequences at fixed phases after it
             dut->px = x; dut->cen_pix = 1; tick(); dut->cen_pix = 0;
             for (int k = 0; k < PIXCLK - 1; k++) tick();
-            if (x > 0) out[y * VIS_W + x - 1] = dut->rgb;       // the mixer returns a pixel a pixel period late
+            if (x > 0) { out[y * VIS_W + x - 1] = dut->rgb; outb[y * VIS_W + x - 1] = dut->bri; }   // a pixel period late
             if (dbgrow == y && x < 160 && (dut->dbg_opq || dut->rgb)) printf("  x%3d opq %x pen %03x %03x %03x %03x rgb(x-1) %06x\n", x, dut->dbg_opq, dut->dbg_pen0, dut->dbg_pen1, dut->dbg_pen2, dut->dbg_pen3, dut->rgb);
         }
         dut->px = VIS_W - 1; dut->cen_pix = 1; tick(); dut->cen_pix = 0;     // one more period: the last pixel's colour
         for (int k = 0; k < PIXCLK - 1; k++) tick();
-        out[y * VIS_W + VIS_W - 1] = dut->rgb;
+        out[y * VIS_W + VIS_W - 1] = dut->rgb; outb[y * VIS_W + VIS_W - 1] = dut->bri;
         for (int k = 0; k < (HTOTAL - VIS_W - 1) * PIXCLK; k++) tick();    // the line's blanking: 6144 clocks a line in all
     }
     if (dut->unsupported) { fprintf(stderr, "RTL raised `unsupported` (or the object list overflowed)\n"); return 1; }
@@ -239,6 +243,7 @@ int main(int argc, char **argv) {
     FILE *of = fopen(argv[5], "wb");
     if (!of) { fprintf(stderr, "cannot write %s\n", argv[5]); return 1; }
     fwrite(out.data(), 4, out.size(), of); fclose(of);
+    if (getenv("BRI_OUT")) { FILE *bf = fopen(getenv("BRI_OUT"), "wb"); if (bf) { fwrite(outb.data(), 1, outb.size(), bf); fclose(bf); } }
     if (getenv("HIST")) {
         printf("sprite drawer, worst line (raster %d), clocks per state:", worst_hist_line);
         for (int s = 0; s < 64; s++) if (worst_hist[s]) printf(" %d:%ld", s, worst_hist[s]);

@@ -93,7 +93,7 @@ module tb_vs_top #(
     wire core_reset = reset | ~mem_ready | dl_hold;
     vs_core #(.HEXDIR("../rtl/data"), .STEP_COST_BUS(STEP_COST_BUS), .STEP_COST_INT(STEP_COST_INT),
               .OBJ_BUILD_LINE(OBJ_BUILD_LINE), .IRQ6_LINE(IRQ6_LINE), .IRQ5_LINE(IRQ5_LINE)) u_core (
-        .clk(clk), .reset(core_reset), .vid_reset(reset),
+        .clk(clk), .reset(core_reset), .vid_reset(reset), .board_dac(1'b0),     // MAME's colours: compared with MAME
         .prog_req(prog_req), .prog_addr(prog_addr), .prog_ack(prog_ack), .prog_q(prog_q),
         .tile_req(tile_req), .tile_addr(tile_addr), .tile_ack(tile_ack), .tile_q(tile_q),
         .spr_req(spr_req), .spr_addr(spr_addr), .spr_ack(spr_ack), .spr_q(spr_q),

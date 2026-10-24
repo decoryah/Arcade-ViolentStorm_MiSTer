@@ -163,7 +163,36 @@ As Metamorphic Force; offsets (-62, -23). 8 MB sprite ROM, a 64-bit word a 16-pi
 `konamigx_mixer` (K055555 + K054338) as Metamorphic Force's, with one change forced by the pixel clock: the blending
 pipeline of the mixer needs 16 clocks a pixel and an 8 MHz pixel is 12 clocks of the 96 MHz clock, so `vs_mixer` runs two
 cores on alternate pixels (24 clocks each) and returns a pixel's colour one pixel period late; `vs_core` delays de /
-sync by the same amount.
+sync by the same amount, and by one pixel more for the DAC stage (below).
+
+### Colours: the video DACs
+The K054338 sends 8-bit R / G / B to three Konami 054573 hybrid DACs and its 8-bit brightness to a 054574 that sets the
+current the 054573s run on (Franck78's Gaiapolis schematic; Ace's 054573 / 054574 reproduction lists Violent Storm among its
+games). The 054573, as the Gaiapolis core traced it from that reproduction's Gerbers and BOM, is a conductance divider (the
+bits pull a summing node down through 49k ... 380R, the node is fed by the brightness current), so its output rises faster
+near the top: mid tones darker than MAME's linear palette. And the brightness dims the DACs after the mix and the curve,
+while `konamigx_mixer` scales each colour before mixing.
+
+Measured against a recording of a VER. EAB PCB (BB4, "VIOLENT STORM Arcade Real Hardware Framemeister + OSSC",
+https://www.youtube.com/watch?v=0hEZvGd4whM: Sigma AV5000 SCART, OSSC 4x, Framemeister 1080p, Elgato HD60S; the game
+picture is the crop 1378 x 1046 at 288, 4 of the 1080p frame), with MAME `viostormeb` frames of the same screens; per
+channel the capture chain's gain and offset fitted out, flat-colour areas only (`work/mame/colour`):
+- Still screens (the intro's car, girl and bike, the title, the player select; 66-77 values a channel): MAME's linear values
+  12.9 levels rms (of 255), a plain gamma 2.05 3.6, the 054573 model 3.4 at its best (about 32 mA; flat from 14 to 35 mA)
+  and 3.7 at the Gaiapolis core's 14.5 mA.
+- Fades: the game fades every screen with the K054338's brightness register 11 (V_BRI 0x55: every layer uses it; 255 -> 0
+  in steps of 2 to 12 a frame; `bri_log.lua`). On the player select's fade-out (44 PCB frames) one brightness per frame,
+  applied inside the DAC (scaling its current), fits as well as the still frames (rms 12.6 against about 10); applied
+  before the curve (MAME's order) it does not (26.8). The effective current against the register, fitted on that fade and
+  anchored at full brightness: b_eff = 255 + 1.2787 (reg - 255) + 0.002090 (reg - 255)^2 of 255 (rms 2.7); it stays above
+  a quarter, where the output is already black. With the register's values from MAME and no fitting per frame, the whole
+  design follows the PCB's fade at 12.7 rms; MAME's colours 24.9, the curve after MAME's digital fade 29.5.
+
+The core (Colours = Board DAC, the default): `vs_mixer` mixes the colours unscaled and passes each pixel's brightness on
+(the last colour drawn there sets it, a shadow keeps it, the backdrop counts as full as MAME draws it; in every recorded
+state all layers share one brightness), and `vs_dac` looks the three channels up in one table, 64 brightness steps x 256
+codes (`tools/make_dac_table.py`, 14.5 mA, the fitted b_eff; 16 M10K), one pixel period later (`vs_core` delays de / sync
+one more pixel). Colours = MAME passes the mixer's colours (MAME's, fades included) through with the same delay.
 
 ### Interrupts and timing
 `metamrph_interrupt` as Metamorphic Force: IRQ6 (`HOLD_LINE`) at MAME line 24, IRQ5 at line 248 when the K053246's register
