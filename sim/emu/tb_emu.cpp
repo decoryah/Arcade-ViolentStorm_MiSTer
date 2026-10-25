@@ -216,6 +216,7 @@ int main(int argc, char **argv) {
     }
     if (getenv("MONO") && atoi(getenv("MONO"))) set_status(8, 1);
     if (getenv("COLOURS") && !strcmp(getenv("COLOURS"), "mame")) set_status(35, 1);   // the OSD's Colours = MAME (default Board DAC)
+    if (getenv("SPRFX") && !strcmp(getenv("SPRFX"), "mame")) set_status(36, 1);       // Sprite effects = MAME (default PCB)
     if (getenv("TEST") && atoi(getenv("TEST"))) set_status(6, 1);
     run(40000);                                  // SDRAM init, cache sweeps
 #ifdef PROBE

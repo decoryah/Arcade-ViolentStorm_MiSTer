@@ -54,6 +54,12 @@ module k053247_draw #(
     input  logic [15:0] opset,          // k053247 register 0x0c
     /* verilator lint_on UNUSEDSIGNAL */
     input  logic  [7:0] colorbase,      // sprite colour base, pre-masked
+    // pcb_fx (the OSD's Sprite effects = PCB): where the K055555's SHD_PRI_SEL field for a shadow's table is 3,
+    // the shadow does not fall on a sprite pixel drawn before it whose priority is the shadow's or higher
+    // (a number no larger): a character's floor shadow stays off a character beside it, and a fade stays off
+    // the stage map, as on the board. MAME draws it over both.
+    input  logic        pcb_fx,
+    input  logic  [7:0] shd_pri_sel,    // K055555 register 41
 
     output logic  [9:0] list_idx,
     output logic  [7:0] yr_addr,        // the entry's line range from the list builder
@@ -120,6 +126,7 @@ module k053247_draw #(
     logic [10:0] shade [(1 << SB) << LB_AW];    // {flag, table[1:0], priority[7:0]}
     logic  [7:0] zbuf  [VIS_W];                 // z of the solid pixel drawn last
     logic [16:0] szbuf [VIS_W];                 // {written, z, priority}
+    logic  [3:0] rbuf  [VIS_W];                 // {written, pri[5:3]} of the solid pixel drawn last (pcb_fx)
 
     logic [16:0] rd_solid;
     logic [10:0] rd_shade;
@@ -301,13 +308,18 @@ module k053247_draw #(
     wire [LB_AW-1:0]   rd_lbi = (st == D_PIX) ? lbis_next[LB_AW-1:0] : lbis_first[LB_AW-1:0];
     logic  [7:0] zb_q;
     logic [16:0] szb_q;
+    logic  [3:0] rb_q;
     always_ff @(posedge clk) begin
         zb_q  <= zbuf[rd_lbi];
         szb_q <= szbuf[rd_lbi];
+        rb_q  <= rbuf[rd_lbi];
     end
     wire       szb_w = szb_q[16];
     wire [7:0] szb_z = szb_q[15:8];
     wire [7:0] szb_p = szb_q[7:0];
+    // pcb_fx: this object is a shadow under the strict priority test, and the solid under the pixel wins it
+    logic      ptest;
+    wire       rcv_wins = ptest && rb_q[3] && (opri >= {2'd0, rb_q[2:0], 3'd0});
     // the decided pixel, one cycle ahead of its write
     logic            px_valid_a, solid_a, shade_a, ovl_a;
     logic [LB_AW-1:0] lbi_a;
@@ -366,6 +378,7 @@ module k053247_draw #(
                     drawmode <= list_q[7:4];
                     shtab    <= list_q[1:0];
                     shdpen   <= (list_q[7:4] == 4'd5) ? 4'd1 : 4'd15;       // zdrawgfxzoom32GP: granularity - 1
+                    ptest    <= pcb_fx && (list_q[7:4] >= 4'd4) && (shd_pri_sel[{list_q[1:0], 1'b0} +: 2] == 2'd3);
                     ram_addr <= {list_q[15:8], 3'd0};
                     st <= D_R1;
                 end
@@ -514,7 +527,8 @@ module k053247_draw #(
                             && !(drawmode[1:0] != 2'd0 && pen >= shdpen)
                             && (zb_q >= zcode);
                     // a shadow pixel needs the shadow buffer's z >= its z and a priority above its own
-                    shade_a <= !tile_solid && (pen >= shdpen) && (szb_z >= zcode) && (szb_p > opri);
+                    // (and with pcb_fx's test, no solid of its priority or higher under it)
+                    shade_a <= !tile_solid && (pen >= shdpen) && (szb_z >= zcode) && (szb_p > opri) && !rcv_wins;
                     ddax <= ddax + {8'd0, stride_x};
                     if (cur_px >= pxr) st <= D_NEXTTX;
                     else cur_px <= cur_px + 18'sd1;
@@ -540,6 +554,7 @@ module k053247_draw #(
             if (px_valid_a && solid_a) begin
                 dbg_pxw <= dbg_pxw + 1'd1;
                 zbuf[lbi_a]          <= zcode;
+                rbuf[lbi_a]          <= {1'b1, opri[5:3]};
                 solid[{slot, lbi_a}] <= {1'b1, color[6:0], pen_a, opri[5:3], mixc};
                 shade[{slot, lbi_a}] <= 11'd0;  // a later solid clears the shadow
             end else if (px_valid_a && shade_a) begin
@@ -551,6 +566,7 @@ module k053247_draw #(
                 shade[{slot, clr_i}] <= '0;
                 zbuf[clr_i]  <= 8'hff;
                 szbuf[clr_i] <= {1'b0, 16'hffff};
+                rbuf[clr_i]  <= 4'd0;
             end
         end
     end

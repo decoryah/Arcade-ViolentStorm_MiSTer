@@ -159,6 +159,41 @@ that is what keeps four layers of 49 tiles inside the 6,144-clock line at SDRAM 
 ### Sprites (K055673 RNG layout, 4bpp)
 As Metamorphic Force; offsets (-62, -23). 8 MB sprite ROM, a 64-bit word a 16-pixel row.
 
+### Sprite effects: shadow code 3 and the shadow priority test
+Two things the board draws that MAME 0.289 does not. Both were found by a patched MAME someone made for this game (the
+owner's `violent-storm-fixes.pdf`, five changes) and checked here against BB4's PCB recording (see Colours below) and
+MAME logs of the same scenes (`work/pdf_check`).
+- **Shadow code 3** (attribute bits 11:10 = 3). `metamrph_sprite_callback` sets `K055555_SKIPSHADOW` for it, so MAME
+  draws nothing (the sprites in question are pens 0 and 15 only). The game uses it twice. Its fades: at every stage
+  change and every attract demo, sprites 0xe140 (4 x 4 tiles, zoom 0x14 / 0x10: about 205 x 256 pixels; two over the
+  right half, at x 0x18f, screen 195..399, and one over the left) at priority 0 and z 0x1a..0x1c, while the K054338's
+  shadow table 3 ramps -1 -> -256 (fade-out, about 40 frames) and back up from -256 or -224 (fade-in) with SHAD3_PRI
+  0x00; the logs (the attract, stage 1 and stage 2) show shadow code 3 with table 3 active only here and in the
+  fireworks below. The playfield, the characters and the HUD go dark, the stage map (sprites of priority 0 drawn after)
+  stays bright. MAME keeps full brightness and then cuts to black. The PCB fades (3:26 and 27:33 in the recording). And
+  the stage-clear fireworks: sprite 0x9e40 (8 x 8 tiles, zoom growing from 0x186), table 3 set to a bright colour that
+  changes with every burst ((+255, 0, +255) in the MAME run, green and yellow ones in the recording at 7:10) and ramped
+  back to 0 over 28 frames, SHAD2 / SHAD3_PRI 0x28.
+- **The parked sprites.** The game leaves the two right-half 0xe140 entries live all through stage 2 (table 3 at -1, so
+  MAME's +-7 threshold keeps them off). Drawn as shadows during the fireworks they tint the whole right half in the burst's
+  colour (the owner's screenshot of a MAME that draws shadow code 3); the PCB shows no tint. The patched MAME, and this
+  core, skip 0xe140 while SHAD3_PRI is 0x28. Why the board does not show them is not known.
+- **The shadow priority test.** With the K055555's SHD_PRI_SEL field for the shadow's table at 3 (register 41 is 0x3f in
+  every frame logged), the patch lets a shadow pixel fall only on sprite pixels of lower priority than its own (a larger
+  number), not on one of equal or higher. MAME 0.289 darkens them all. Characters share SHAD1's priority (0x10 / 0x18), so
+  a floor shadow no longer darkens a character beside it; the PCB agrees in the one clean case found (1:54, a lying enemy's
+  hair across Wade's shadow: the floor darkens from 105 to 81, the hair stays at 248). It also keeps the fades off the map.
+- Not done: the patch's opaque black shadow pens (sprites whose pen 15 is black drawn without taking z, a test on the
+  palette colour) and its rounding of a zoomed sprite's half-size (a door seam; the recording's stage-6 gate is a tile
+  layer, and of 307 one-pixel gaps the rounding would close in stage 1, 306 lie under another sprite).
+
+The core (Sprite effects = PCB, the default): `k053247_objlist` makes a shadow-code-3 sprite one shadow object of table 3
+(drawmode 5: every non-zero pen, no solid object) at SHAD3_PRI when table 3 is on, except 0xe140 while SHAD3_PRI is 0x28
+(it reads the code, word 1, for that); `k053247_draw` keeps the priority of the solid pixel drawn last at each x and drops
+a shadow pixel over one of the shadow's priority or higher when the test is on. One limit of the core's single shadow per
+pixel: during a fade a character's floor shadow gives way to the fade's (MAME's patch darkens twice). Sprite effects = MAME
+is MAME 0.289's picture.
+
 ### Mixer
 `konamigx_mixer` (K055555 + K054338) as Metamorphic Force's, with one change forced by the pixel clock: the blending
 pipeline of the mixer needs 16 clocks a pixel and an 8 MHz pixel is 12 clocks of the 96 MHz clock, so `vs_mixer` runs two

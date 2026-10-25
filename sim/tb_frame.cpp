@@ -3,7 +3,8 @@
 //
 //   tb_frame <state.txt> <image.rom> <zoom.hex> <recip.hex> <out.rgb>
 // BRI_POST=1: the mixer's Board DAC mode (colours mixed unscaled); BRI_OUT=<file>: the per-pixel brightness the mixer
-// passes on, one byte a pixel
+// passes on, one byte a pixel; PCB_FX=1: the OSD's Sprite effects = PCB (the shadow-code-3 effects, the strict shadow
+// priority; MAME's picture without it)
 // The image is the flat ROM image the core loads (tools/mra_build.py on mra/*.mra).
 #include "Vtb_frame_top.h"
 #include "verilated.h"
@@ -76,6 +77,7 @@ int main(int argc, char **argv) {
     dut = new Vtb_frame_top;
     dut->reset = 1; for (int i = 0; i < 8; i++) tick();
     dut->reset = 0;
+    dut->pcb_fx = getenv("PCB_FX") ? 1 : 0;
     for (int i = 0; i < 64; i++) tick();
 
     auto &k56 = st.f["K56REGS"]; auto &k55 = st.f["K55REGS"]; auto &k38 = st.f["K38REGS"];

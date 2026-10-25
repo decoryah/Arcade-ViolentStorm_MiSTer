@@ -5,19 +5,23 @@ built on the Metamorphic Force and Monster Maulers cores (which come from plasti
 Pocket): the same 68000 / Z80 / K056832 / K055673 / K055555 / K054338 / K054539 board family, with this game's map, a
 384 x 224 picture at an 8 MHz pixel clock and the K055550 helper chip.
 
-**Status.** The first build, `violentstorm_20261012`, was tested on a real MiSTer by the repository owner: the game works in
-all areas. It had one known fault, a frozen picture with Scandoubler Fx or `forced_scandoubler` (see below), fixed in
-`violentstorm_20261013`. `violentstorm_20261014` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs, every clock's slack
-positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold) added **fast loading** (about a second with a recent
-Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; 20261013 and 20261014 were tested on the board by
-the owner the same way and work. `violentstorm_20261022` (20,326 ALMs = 48 %, 520 / 553 M10K, 74 / 112 DSPs, +0.21 ns
-setup on the core clock, +0.23 ns the tightest hold) changed the controls to the cabinet's (three players, Attack / Jump, see
-Controls below) and was tested on the board by the owner the same way. The current build, `releases/violentstorm_20261024.rbf`
-(20,446 ALMs = 49 %, 537 / 553 M10K, 74 / 112 DSPs, +0.36 ns setup on the core clock, +0.25 ns the tightest hold), adds the
-**Colours** option (Board DAC, the default: the board's video DACs, fitted to a recording of a real PCB; see Colours below)
-and was tested on the board by the owner the same way: the colours are right. One person's tests on one board; the colours were compared with a recording of an
-arcade PCB, the rest was not. Everything in the verification table below was checked in simulation against
-MAME 0.289 (the benches under `sim/`).
+**Status.** The first build, `violentstorm_20261012`, was tested on a real MiSTer by the repository owner: the game
+works in all areas. It had one known fault, a frozen picture with Scandoubler Fx or `forced_scandoubler` (see below),
+fixed in `violentstorm_20261013`. `violentstorm_20261014` (Quartus 17.0.2: 49 % ALMs, 520 / 553 M10K, 74 / 112 DSPs,
+every clock's slack positive: +0.27 ns on the 96 MHz core clock, +0.20 ns the tightest hold) added **fast loading**
+(about a second with a recent Main_MiSTer) and the **Scale** option, both from the Metamorphic Force core; 20261013 and
+20261014 were tested on the board by the owner the same way and work. `violentstorm_20261022` (20,326 ALMs = 48 %, 520 /
+553 M10K, 74 / 112 DSPs, +0.21 ns setup on the core clock, +0.23 ns the tightest hold) changed the controls to the
+cabinet's (three players, Attack / Jump, see Controls below) and was tested on the board by the owner the same way.
+`violentstorm_20261024` (20,446 ALMs = 49 %, 537 / 553 M10K, 74 / 112 DSPs, +0.36 ns setup on the core clock, +0.25 ns
+the tightest hold) added the **Colours** option (Board DAC, the default: the board's video DACs, fitted to a recording
+of a real PCB; see Colours below) and was tested on the board by the owner the same way: the colours are right. The
+current build, `releases/violentstorm_20261025.rbf` (20,556 ALMs = 49 %, 537 / 553 M10K, 74 / 112 DSPs, +0.28 ns setup
+on the core clock, +0.24 ns the tightest hold), adds the **Sprite effects** option (PCB, the default: the game's fades
+between scenes and the stage-clear fireworks, which MAME skips, and the shadows' priority; see Sprite effects below) and
+was tested on the board by the owner the same way: it works. One person's tests on one board; the colours and the sprite
+effects were compared with a recording of an arcade PCB, the rest was not. Everything in the verification table below
+was checked in simulation against MAME 0.289 (the benches under `sim/`).
 
 ## What is verified (against MAME 0.289, `viostorm`)
 
@@ -30,6 +34,7 @@ MAME 0.289 (the benches under `sim/`).
 | Whole machine | from reset (with the power-on check skipped) to the character select: the same picture as MAME's at frames 60 and 300, and at 500 (a few frames' timeline offset); the MiSTer top level end to end (`sim/emu`: loader check of all 9.5 M words, frame period exactly 1,622,016 clocks = 59.1856 Hz, 384 x 224, EEPROM save path) passes, also with CRT Adjust on (amounts 0, and H-Size +2 / H-Position -6 / V-Shift -3: the picture exactly 400 pixels wide and 3 lines up), and the Flip Screen bench with the 384-pixel raster |
 | Controls | `sim/inputs/run.sh`: `rtl/vs_inputs.sv` against the decode the core had before (on the old pad layout) and against a table of the cabinet's names, every value of every controller and key and a million random vectors: 1,049,177 checks, 0 mismatches (a copy with attack and jump swapped fails 899,289); `sim/emu` `JOYTEST=1`: each of the 32 bits of the four controllers pressed alone through the real top level, 128 presses, 0 wrong; which inputs the game uses: see Controls below |
 | Colours | `sim/dac/run.sh`: `rtl/vs_dac.sv` against its table, every code at every brightness step and 100,000 random pixels with the mode switching, 120,480 pixels, 0 wrong (a copy with red and green swapped fails 58,362); the frame corpus with Colours = MAME 86 of 86 pixel-identical, and in Board DAC mode 86 of 86 (all at full brightness, the brightness passed on 255 everywhere); four MAME states in the middle of fades (register 11 = 215 / 135 / 225 / 185): MAME's colours identical to MAME's snapshots, Board DAC's mix identical to the same state at full brightness, the brightness the register's on every pixel that is not black; `sim/emu` (90 frames after a fast load): Colours = MAME byte-identical to the builds before, Board DAC that picture through the curve exactly, the geometry unchanged |
+| Sprite effects | the frame bench (`PCB_FX=1` for PCB): Sprite effects = MAME still 86 of 86 corpus frames pixel-identical, and 15 more MAME states (the stage-2 clear's fireworks and fade, the stage-2 train roof) as well; = PCB: at the stage-2 clear no right-half tint, the fireworks, and the fade dimming everything but the stage map (as the PCB recording shows it), on the train roof the floor shadows on both halves of the screen, and of the 86 corpus frames only 9 attract-demo frames differ from MAME (18 to 292 pixels each, where a floor shadow no longer covers a character); `sim/emu` (90 frames after a fast load, `SPRFX=mame` for MAME): both settings byte-identical to the builds before |
 
 ## Install
 
@@ -72,6 +77,7 @@ The two bootlegs in MAME (`viostormubbl`, `viostormabbl`) are not supported.
 | Flip Screen | Off, On | The picture turned 180 degrees on every output (a frame buffer in the DDR3: one frame of delay while on) |
 | Scandoubler Fx | None, HQ2x, CRT 25%, CRT 50%, CRT 75% | |
 | Colours | Board DAC, MAME | Board DAC (the default): the colours as the board's video DACs give them, the game's fades included; MAME: the palette's values as MAME shows them. See Colours |
+| Sprite effects | PCB, MAME | PCB (the default): the fades between scenes, the stage-clear fireworks and the shadows' priority as the board shows them; MAME: MAME 0.289's picture. See Sprite effects |
 | CRT Adjust | submenu: Off, On; H-Size 0..+2 / -16..-1, H-Position -48..+20, V-Shift -16..+15 | Fits the picture to a 15 kHz analog output. Does nothing while the scandoubler is in use |
 | Number of Players | 2, 3 | The board's DIP |
 | Coin Mechanism | Common, Independent | The board's DIP |
@@ -130,6 +136,26 @@ same screens (`docs/hardware.md`, "Colours"):
 - The player select's fade-out, 44 frames, each with the brightness MAME's register gives it: this design 12.7 rms (the
   still frames: about 10), MAME's colours 24.9, the same curve applied after MAME's digital fade 29.5.
 
+### Sprite effects
+
+Two things the board draws that MAME 0.289 does not. They were found by a patched MAME someone made for this game and
+checked here against BB4's PCB recording and MAME logs of the same scenes (`docs/hardware.md`, "Sprite effects"):
+
+- **Fades and fireworks.** The game fades out and in at every stage change and every attract demo, and draws the
+  stage-clear fireworks, with sprites whose shadow code is 3: every pixel of them darkens (or, for the fireworks, lights
+  up in a colour that changes from burst to burst) what lies under it. MAME skips these sprites, so it shows no fade (full
+  brightness, then a cut to black) and no fireworks. On the board the playfield, the characters and the HUD fade while the
+  stage map stays bright.
+- **Shadows and characters.** A shadow does not fall on a sprite of its own priority or higher, so a character's floor
+  shadow no longer darkens another character next to it (MAME darkens it).
+
+**Sprite effects = PCB** (the default) draws both; **MAME** gives MAME 0.289's picture, pixel for pixel. One rule is copied
+from the patched MAME without a known hardware reason: the game keeps two of the fade sprites parked over the right half of
+the screen through stage 2, and they are not drawn while the fireworks use their shadow table (otherwise the whole right
+half takes the fireworks' colour, which the board does not show). Two of the patch's five changes are not in: its opaque
+black shadow pens (a test on the palette colour) and its rounding of zoomed sprites' positions (a one-pixel door seam,
+not found in the recording).
+
 ## What differs from Metamorphic Force
 
 | | Metamorphic Force | Violent Storm |
@@ -150,6 +176,9 @@ same screens (`docs/hardware.md`, "Colours"):
   the whole ROM is reachable through the 310000 read-back window the power-on check uses.
 * `m_last_alpha_tile_mix_code` (the category-1 tiles' level) follows the tiles in raster order here, MAME's tilemap
   decode order there; identical in every corpus frame.
+* Sprite effects: by default (PCB) the fades, the fireworks and the shadow priority are drawn as on the board (see Sprite
+  effects); while a fade runs, a character's floor shadow gives way to the fade's darkening (one shadow a pixel), where
+  the patched MAME applies both. Sprite effects = MAME is MAME 0.289's picture.
 * Colours: by default (Colours = Board DAC) the output follows the board's video DACs and fades in them; Colours = MAME
   gives MAME's linear palette and MAME's fades, pixel for pixel.
 * No later-stage or boss corpus yet (see `PLAN.md`).
@@ -216,6 +245,9 @@ frozen states, `sim/run_frames.sh` renders it and compares with MAME's snapshots
   [VIOLENT STORM Arcade Real Hardware Framemeister + OSSC](https://www.youtube.com/watch?v=0hEZvGd4whM) (YouTube, @Bun74): a real VER. EAB
   PCB through a Sigma AV5000 supergun, an OSSC, a Framemeister and an Elgato HD60S, the whole game. The Colours table,
   its curve and its fades, is fitted to it.
+* The author of the patched MAME behind the Sprite effects option (its write-up, `violent-storm-fixes.pdf`, passed on by
+  the repository owner): shadow code 3 drawn as a full shadow, the shadow priority test, the parked-sprite
+  exception.
 * **Jose Tejada (jotego)** -- JTFRAME's MiSTer SDRAM clock phase and read-capture timing, which this core's PLL and
   controller settings follow; and, with the other authors of the independent Konami cores read as references (jlrh's
   `konami-fpga`, ppriest's `Arcade-KonamiGX_MiSTer`), the cross-checks of the K054338, K055555, K056832 and K055673.

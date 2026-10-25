@@ -89,6 +89,7 @@ module vs_core #(
 
     // video, 6 MHz pixel rate on cen_pix
     input  logic        board_dac,      // the OSD's Colours: 1 the board's DACs (rtl/vs_dac.sv), 0 MAME's linear palette
+    input  logic        pcb_fx,         // the OSD's Sprite effects: 1 PCB (k053247_objlist, k053247_draw), 0 MAME
     output logic        cen_pix,
     output logic [23:0] rgb,
     output logic        hsync,
@@ -340,7 +341,7 @@ module vs_core #(
     logic  [7:0] yr_addr; logic [21:0] yr_q;
     assign zoom_addr = ol_busy ? ol_zoom_addr : dr_zoom_addr;
     k053247_objlist #(.DY(-23), .PRI_DIV4(1'b1), .SKIP_SHADOW3(1'b1)) u_ol (
-        .clk(clk), .reset(reset), .start(obj_build), .done(ol_done), .busy(ol_busy),
+        .clk(clk), .reset(reset), .pcb_fx(pcb_fx), .start(obj_build), .done(ol_done), .busy(ol_busy),
         .opset(opset), .objset1(objset1), .shadowon(shadowon), .shdpri(shdpri),
         .nozcode(1'b0), .mix_zero(mix_zero), .mix_full(mix_full), .k46_offy(k46offy),
         .zoom_addr(ol_zoom_addr), .zoom_q(zoom_q), .yr_addr(yr_addr), .yr_q(yr_q),
@@ -366,6 +367,7 @@ module vs_core #(
         .clk(clk), .reset(reset), .line_start(dr_ls), .line(dr_line), .abort(dr_abort), .busy(dr_busy), .clearing(dr_clearing),
         .rd_slot(vcount[SPR_SB-1:0]), .rd_ok(spr_rd_ok),
         .k46r5(objset1), .k46_offx(k46offx), .k46_offy(k46offy), .opset(opset), .colorbase(spr_colorbase),
+        .pcb_fx(pcb_fx), .shd_pri_sel(k55regs[41]),
         .list_idx(list_idx), .list_q(list_q), .list_count(list_count), .yr_addr(yr_addr), .yr_q(yr_q),
         .ram_addr(dr_sram_addr), .ram_q(scopy_q),
         .rom_req(drw_req), .rom_addr(drw_addr), .rom_ack(drw_ack), .rom_q(drw_q),

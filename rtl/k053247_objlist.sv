@@ -30,6 +30,15 @@ module k053247_objlist #(
     input  logic        clk,
     input  logic        reset,
 
+    // pcb_fx (the OSD's Sprite effects = PCB): a shadow code of 3 makes the whole sprite a shadow of table 3
+    // (every non-zero pen, no solid object) at SHAD3's priority, instead of SKIP_SHADOW3's nothing: the
+    // game's fades (sprite 0xe140, 4x zoomed, over the playfield) and the stage-clear fireworks (0x9e40)
+    // are drawn this way, as on the board. One exception, as the MAME patch that found this has it: the
+    // 0xe140 sprites the game leaves parked over the right half are not drawn while SHAD3's priority is
+    // 0x28 (it is during the fireworks, which set table 3 to a bright colour; the board shows no such
+    // half-screen tint). The reason the board hides them is not known.
+    input  logic        pcb_fx,
+
     input  logic        start,          // pulse once per frame, in vblank
     output logic        done,
     output logic        busy,
@@ -107,6 +116,7 @@ module k053247_objlist #(
     /* verilator lint_off UNUSEDSIGNAL */
     logic [15:0] w0, w6;    // only the active flag, z code, priority
                             // and shadow field are used here
+    logic [15:0] w1;        // the code, for pcb_fx's exception
     logic [15:0] w2, w4;    // y and the y zoom, for the line range
     /* verilator lint_on UNUSEDSIGNAL */
 
@@ -160,13 +170,17 @@ module k053247_objlist #(
     wire        mix_nz        = (mixcode != 2'd0);
     wire        mix_skip      = mix_nz && mix_zero[mixcode];     // alpha <= 0: konamigx_mixer_draw skips the object
     wire        mix_blend     = mix_nz && !mix_full[mixcode];    // alpha 255: zdrawgfxzoom32GP clears the blend bit
-    wire        add_solid     = (!has_shadow || shadow_demote) && !mix_skip;
+    // pcb_fx: shadow code 3 is a full shadow of table 3 (shadow_idx is 2), drawn when that table is on
+    wire        full3         = pcb_fx && (shadow_r == 2'd3);
+    wire        park3         = (w1 == 16'he140) && (shdpri[2] == 8'h28);
+    wire        add_solid     = (!has_shadow || shadow_demote) && !mix_skip && !full3;
     wire  [3:0] solid_mode    = {2'd0, mix_blend, has_shadow};
     wire        shadowon_sel  = shadowon[shadow_idx];
-    wire        add_shadow    = has_shadow &&
+    wire        add_shadow    = full3 ? (shadowon[2] && !park3) :
+                                has_shadow &&
                                 (shadow_demote ? shadowon_sel : shadowon[0]) &&
                                 !(SKIP_SHADOW3 && shadow_r == 2'd3);
-    wire  [3:0] shadow_mode   = shadow_demote ? 4'd4 : 4'd5;
+    wire  [3:0] shadow_mode   = (shadow_demote && !full3) ? 4'd4 : 4'd5;
     wire  [7:0] spri          = opset[5] ? pri : shdpri[shadow_idx];
     // a sprite whose shadow code is 1 with SD0EN off is dropped entirely
     wire        drop_entry    = has_shadow && !shadow_demote && !shadowon[0];
@@ -195,7 +209,7 @@ module k053247_objlist #(
                 end
 
                 // read word 0 (active + zcode), word 6 (colour/attributes), and
-                // for a live entry words 2 and 4 (y, y zoom) for its line range
+                // for a live entry words 2 and 4 (y, y zoom) for its line range and word 1 (code)
                 O_B0: begin ram_addr <= {ent, 3'd0};       st <= O_B1; end
                 O_B1: begin ram_addr <= {ent, 3'd6};       st <= O_B2; end
                 O_B2: begin w0 <= ram_q; ram_addr <= {ent, 3'd2}; st <= O_B3; end
@@ -203,9 +217,9 @@ module k053247_objlist #(
                     w6 <= ram_q; ram_addr <= {ent, 3'd4};
                     st <= active ? O_B4 : O_NEXTENT;
                 end
-                O_B4: begin w2 <= ram_q; st <= O_B5; end
+                O_B4: begin w2 <= ram_q; ram_addr <= {ent, 3'd1}; st <= O_B5; end
                 O_B5: begin w4 <= ram_q; zoom_addr <= ram_q[9:0]; st <= O_B6; end
-                O_B6: st <= O_B7;
+                O_B6: begin w1 <= ram_q; st <= O_B7; end
                 O_B7: begin zoomy <= zoom_q; oy2_r <= oy2; st <= O_B8; end
                 O_B8: begin goy_r <= goy; span_r <= hzr[27:12]; st <= O_B9; end
                 O_B9: begin bot_r <= goy_r + $signed({2'd0, span_r}); st <= O_B10; end   // last line + 1
